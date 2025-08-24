@@ -1,0 +1,8 @@
+{
+  "name": "bazario/backend",
+  "description": "PHP backend for Bazario",
+  "require": {
+    "ext-pdo": "*",
+    "ext-pgsql": "*"
+  }
+}
