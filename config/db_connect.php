@@ -19,8 +19,7 @@ class Database
                 ";port=" . $this->config['port'] .
                 ";dbname=" . $this->config['dbname'] .
                 ";sslmode=require" .
-                ";sslrootcert=/home/aishki/httpdocs/ssl/bazario/ca.pem";
-
+                ";sslrootcert=" . __DIR__ . "/../ssl/ca.pem";
 
             $this->conn = new PDO(
                 $dsn,
