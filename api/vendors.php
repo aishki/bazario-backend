@@ -76,58 +76,79 @@ switch ($method) {
             try {
                 $db->beginTransaction();
 
-                // Update vendors table
-                $query = "UPDATE vendors SET 
-                            business_name = :business_name,
-                            description = :description,
-                            logo_url = :logo_url,
-                            social_links = :social_links,
-                            business_category = :business_category
-                          WHERE id = :vendor_id";
+                // Fetch existing vendor first
+                $check_query = "SELECT * FROM vendors WHERE id = :vendor_id";
+                $check_stmt = $db->prepare($check_query);
+                $check_stmt->bindParam(':vendor_id', $data->vendor_id);
+                $check_stmt->execute();
+                $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
 
-                $stmt = $db->prepare($query);
-                $stmt->bindParam(':vendor_id', $data->vendor_id);
-                $stmt->bindParam(':business_name', $data->business_name);
-                $stmt->bindParam(':description', $data->description);
-                $stmt->bindParam(':logo_url', $data->logo_url);
+                if (!$existing) {
+                    echo json_encode([
+                        "success" => false,
+                        "message" => "Vendor not found"
+                    ]);
+                    exit;
+                }
 
-                $social_links_json = isset($data->social_links) ? json_encode($data->social_links) : null;
-                $stmt->bindParam(':social_links', $social_links_json);
-                $stmt->bindParam(':business_category', $data->business_category);
+                // Build dynamic update query for vendors
+                $update_fields = [];
+                $params = [":vendor_id" => $data->vendor_id];
 
-                $stmt->execute();
+                if (isset($data->business_name)) {
+                    $update_fields[] = "business_name = :business_name";
+                    $params[":business_name"] = $data->business_name;
+                }
+                if (isset($data->description)) {
+                    $update_fields[] = "description = :description";
+                    $params[":description"] = $data->description;
+                }
+                if (isset($data->logo_url)) {
+                    $update_fields[] = "logo_url = :logo_url";
+                    $params[":logo_url"] = $data->logo_url;
+                }
+                if (isset($data->social_links)) {
+                    $update_fields[] = "social_links = :social_links";
+                    $params[":social_links"] = json_encode($data->social_links);
+                }
+                if (isset($data->business_category)) {
+                    $update_fields[] = "business_category = :business_category";
+                    $params[":business_category"] = $data->business_category;
+                }
 
-                // Check if contact info exists in the data and handle phone number update
+                if (!empty($update_fields)) {
+                    $query = "UPDATE vendors SET " . implode(", ", $update_fields) . " WHERE id = :vendor_id";
+                    $stmt = $db->prepare($query);
+                    $stmt->execute($params);
+                }
+
+                // ---- Handle vendor_contacts (same as before) ----
                 if (isset($data->contact_info) || isset($data->phone_number)) {
-                    // First check if vendor_contacts record exists
                     $check_query = "SELECT id FROM vendor_contacts WHERE id = :vendor_id";
                     $check_stmt = $db->prepare($check_query);
                     $check_stmt->bindParam(':vendor_id', $data->vendor_id);
                     $check_stmt->execute();
 
                     if ($check_stmt->rowCount() > 0) {
-                        // Update existing record
                         $contact_query = "UPDATE vendor_contacts SET 
-                                            first_name = :first_name,
-                                            middle_name = :middle_name,
-                                            last_name = :last_name,
-                                            suffix = :suffix,
-                                            phone_number = :phone_number,
-                                            email = :email,
-                                            position = :position
-                                          WHERE id = :vendor_id";
+                                        first_name = :first_name,
+                                        middle_name = :middle_name,
+                                        last_name = :last_name,
+                                        suffix = :suffix,
+                                        phone_number = :phone_number,
+                                        email = :email,
+                                        position = :position
+                                      WHERE id = :vendor_id";
                     } else {
-                        // Insert new record
                         $contact_query = "INSERT INTO vendor_contacts 
-                                            (id, first_name, middle_name, last_name, suffix, phone_number, email, position, created_at) 
-                                          VALUES 
-                                            (:vendor_id, :first_name, :middle_name, :last_name, :suffix, :phone_number, :email, :position, NOW())";
+                                        (id, first_name, middle_name, last_name, suffix, phone_number, email, position, created_at) 
+                                      VALUES 
+                                        (:vendor_id, :first_name, :middle_name, :last_name, :suffix, :phone_number, :email, :position, NOW())";
                     }
 
                     $contact_stmt = $db->prepare($contact_query);
                     $contact_stmt->bindParam(':vendor_id', $data->vendor_id);
 
-                    // Handle contact_info object or direct phone_number
                     if (isset($data->contact_info)) {
                         $contact_stmt->bindParam(':first_name', $data->contact_info->first_name);
                         $contact_stmt->bindParam(':middle_name', $data->contact_info->middle_name);
@@ -137,7 +158,6 @@ switch ($method) {
                         $contact_stmt->bindParam(':email', $data->contact_info->email);
                         $contact_stmt->bindParam(':position', $data->contact_info->position);
                     } else {
-                        // Handle direct phone number update from Flutter
                         $phone_number = isset($data->phone_number) ? $data->phone_number : null;
                         $contact_stmt->bindParam(':first_name', $null = null);
                         $contact_stmt->bindParam(':middle_name', $null);
@@ -153,24 +173,24 @@ switch ($method) {
 
                 $db->commit();
 
-                echo json_encode(array(
+                echo json_encode([
                     "success" => true,
                     "message" => "Vendor information updated successfully"
-                ));
+                ]);
             } catch (Exception $e) {
                 $db->rollback();
                 error_log("Vendor update error: " . $e->getMessage());
                 error_log("Vendor update data: " . json_encode($data));
-                echo json_encode(array(
+                echo json_encode([
                     "success" => false,
                     "message" => "Error updating vendor: " . $e->getMessage()
-                ));
+                ]);
             }
         } else {
-            echo json_encode(array(
+            echo json_encode([
                 "success" => false,
                 "message" => "Vendor ID is required"
-            ));
+            ]);
         }
         break;
 
