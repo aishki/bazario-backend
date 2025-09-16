@@ -19,14 +19,24 @@ switch ($method) {
 
             // Get complete vendor information including contacts and social links
             $query = "SELECT 
-            v.id, v.business_name, v.description, v.logo_url, 
-            v.social_links, v.verified, v.business_category, v.created_at,
-            vc.first_name, vc.middle_name, vc.last_name, vc.suffix,
-            vc.phone_number, vc.email as contact_email, vc.position
-          FROM vendors v 
-          LEFT JOIN vendor_contacts vc ON v.id = vc.id 
-          WHERE v.id = :vendor_id";
-
+                        v.id AS vendor_id,
+                        v.business_name,
+                        v.description,
+                        v.logo_url,
+                        v.social_links,
+                        v.verified,
+                        v.business_category,
+                        v.created_at,
+                        vc.first_name,
+                        vc.middle_name,
+                        vc.last_name,
+                        vc.suffix,
+                        vc.phone_number,
+                        vc.email AS contact_email,
+                        vc.position
+                    FROM vendors v
+                    LEFT JOIN vendor_contacts vc ON v.id = vc.id
+                    WHERE v.id = :vendor_id";
 
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
@@ -52,7 +62,7 @@ switch ($method) {
             }
         } else {
             // Get all vendors (for listing)
-            $query = "SELECT v.id, v.business_name, v.description, v.logo_url, 
+            $query = "SELECT v.id AS vendor_id, v.business_name, v.description, v.logo_url, 
                              v.verified, v.business_category, v.created_at
                       FROM vendors v 
                       ORDER BY v.created_at DESC";
