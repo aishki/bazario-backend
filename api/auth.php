@@ -20,10 +20,12 @@ if ($data->action == "login") {
 
     try {
         $sql = "SELECT u.id, u.email, u.password_hash, u.role, u.username,
-                       v.id as vendor_id, v.business_name, v.description, v.business_category, v.logo_url, v.verified,
+                       v.id as vendor_id, v.business_name, v.description, v.business_category, v.logo_url, v.verified, v.social_links,
+                       vc.phone_number,
                        c.first_name, c.last_name
                 FROM users u 
                 LEFT JOIN vendors v ON u.id = v.id 
+                LEFT JOIN vendor_contacts vc ON u.id = vc.id
                 LEFT JOIN customers c ON u.id = c.id
                 WHERE u.email = :email";
         $stmt = $database->executeQuery($sql, [':email' => $data->email]);
@@ -54,6 +56,14 @@ if ($data->action == "login") {
                     $response['business_category'] = $user['business_category'];
                     $response['logo_url'] = $user['logo_url'];
                     $response['verified'] = $user['verified'];
+
+                    if (!empty($user['phone_number'])) {
+                        $response['phone_number'] = $user['phone_number'];
+                    }
+
+                    if (!empty($user['social_links'])) {
+                        $response['social_links'] = json_decode($user['social_links'], true);
+                    }
                 }
                 echo json_encode($response);
             } else {
