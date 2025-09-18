@@ -40,6 +40,32 @@ switch ($method) {
         }
         break;
 
+    case 'PUT':
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (!isset($data['id'])) {
+            echo json_encode(["success" => false, "message" => "Product ID is required"]);
+            exit;
+        }
+
+        $query = "UPDATE vendor_products
+                  SET name = :name, description = :description, image_url = :image_url, is_featured = :is_featured
+                  WHERE id = :id";
+
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':id', $data['id']);
+        $stmt->bindParam(':name', $data['name']);
+        $stmt->bindParam(':description', $data['description']);
+        $stmt->bindParam(':image_url', $data['image_url']);
+        $stmt->bindParam(':is_featured', $data['is_featured']);
+
+        if ($stmt->execute()) {
+            echo json_encode(["success" => true, "message" => "Product updated successfully"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Failed to update product"]);
+        }
+        break;
+
     default:
         echo json_encode(["success" => false, "message" => "Method not allowed"]);
         break;
