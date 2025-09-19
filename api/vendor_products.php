@@ -44,7 +44,10 @@ switch ($method) {
         $data = json_decode(file_get_contents("php://input"), true);
 
         if (!isset($data['id'])) {
-            echo json_encode(["success" => false, "message" => "Product ID is required"]);
+            echo json_encode([
+                "success" => false,
+                "message" => "Product ID is required"
+            ]);
             exit;
         }
 
@@ -63,6 +66,34 @@ switch ($method) {
             echo json_encode(["success" => true, "message" => "Product updated successfully"]);
         } else {
             echo json_encode(["success" => false, "message" => "Failed to update product"]);
+        }
+        break;
+
+    case 'DELETE':
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (!isset($data['id'])) {
+            echo json_encode([
+                "success" => false,
+                "message" => "Product ID is required"
+            ]);
+            exit;
+        }
+
+        $query = "DELETE FROM vendor_products WHERE id = :id";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':id', $data['id']);
+
+        if ($stmt->execute()) {
+            echo json_encode([
+                "success" => true,
+                "message" => "Product deleted successfully"
+            ]);
+        } else {
+            echo json_encode([
+                "success" => false,
+                "message" => "Failed to delete product"
+            ]);
         }
         break;
 
