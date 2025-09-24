@@ -43,9 +43,9 @@ try {
                   WHERE 1=1 ";
 
         if ($type === "upcoming") {
-            // $query .= "AND e.schedule_start >= NOW() ";
+            $query .= "AND e.schedule_start >= NOW() ";
         } elseif ($type === "past") {
-            // $query .= "AND e.schedule_end < NOW() ";
+            $query .= "AND e.schedule_end < NOW() ";
         }
 
         $query .= "ORDER BY e.schedule_start ASC";
