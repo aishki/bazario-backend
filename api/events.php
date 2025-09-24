@@ -13,7 +13,7 @@ $vendorId = isset($_GET['vendor_id']) ? $_GET['vendor_id'] : null;
 
 try {
     if ($type === "joined" && $vendorId) {
-        // ✅ Use event_vendors join for joined tab
+        // Use event_vendors join for joined tab
         $query = "SELECT 
                     e.id,
                     e.name,
@@ -30,7 +30,7 @@ try {
         $stmt = $db->prepare($query);
         $stmt->bindParam(":vendor_id", $vendorId);
     } else {
-        // ✅ Use events table only for upcoming/past/all
+        // Use events table only for upcoming/past/all
         $query = "SELECT 
                     e.id,
                     e.name,
@@ -43,9 +43,9 @@ try {
                   WHERE 1=1 ";
 
         if ($type === "upcoming") {
-            $query .= "AND e.schedule_start >= NOW() ";
+            // $query .= "AND e.schedule_start >= NOW() ";
         } elseif ($type === "past") {
-            $query .= "AND e.schedule_end < NOW() ";
+            // $query .= "AND e.schedule_end < NOW() ";
         }
 
         $query .= "ORDER BY e.schedule_start ASC";
