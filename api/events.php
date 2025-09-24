@@ -23,7 +23,7 @@ try {
               FROM events e ";
 
     if ($type === "joined" && $vendorId) {
-        $query .= "INNER JOIN vendor_events ve ON e.id = ve.event_id 
+        $query .= "INNER JOIN event_vendors ve ON e.id = ve.event_id 
                    WHERE ve.vendor_id = :vendor_id";
     } else {
         $query .= "WHERE 1=1 ";
