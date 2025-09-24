@@ -33,14 +33,21 @@ try {
         // Use events table only for upcoming/past/all
         $query = "SELECT 
                     e.id,
+                    e.created_by,
                     e.name,
+                    e.description,
                     e.venue,
+                    e.poster_url,
                     e.schedule_start,
                     e.schedule_end,
+                    e.created_at,
+                    e.requirements,
+                    e.booth_fee,
                     e.max_slots,
                     e.slots_taken
-                  FROM events e
-                  WHERE 1=1 ";
+                FROM events e
+                WHERE 1=1 ";
+
 
         if ($type === "upcoming") {
             $query .= "AND e.schedule_start >= NOW() ";
