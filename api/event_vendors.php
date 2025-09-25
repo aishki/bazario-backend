@@ -28,9 +28,11 @@ if ($method === 'GET' && isset($_GET['event_id']) && isset($_GET['vendor_id'])) 
             "receipt_url" => $row['event_receipt_url']
         ]);
     } else {
+        // No record found = vendor has not applied yet (not an error)
         echo json_encode([
-            "success" => false,
-            "vendor_status" => null
+            "success" => true,
+            "vendor_status" => null,
+            "receipt_url" => null
         ]);
     }
     exit;
@@ -56,7 +58,7 @@ if ($method === "POST") {
 
     try {
         if ($receipt_url) {
-            // ✅ Update status and receipt if record exists
+            // ✅ Upload/update receipt for existing record
             $stmt = $db->prepare("
                 UPDATE event_vendors
                 SET event_receipt_url = :receipt_url, status = :status
@@ -74,7 +76,7 @@ if ($method === "POST") {
                 "message" => "Receipt uploaded/updated"
             ]);
         } else {
-            // ✅ Insert new record or update if already exists
+            // ✅ Insert new record or update status if already exists
             $stmt = $db->prepare("
                 INSERT INTO event_vendors (event_id, vendor_id, status)
                 VALUES (:event_id, :vendor_id, :status)
