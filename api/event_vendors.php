@@ -80,7 +80,7 @@ if ($method === "POST") {
             $stmt = $db->prepare("
                 INSERT INTO event_vendors (event_id, vendor_id, status)
                 VALUES (:event_id, :vendor_id, :status)
-                ON DUPLICATE KEY UPDATE status = VALUES(status)
+                ON CONFLICT (event_id, vendor_id) DO NOTHING
             ");
             $stmt->execute([
                 ":event_id" => $event_id,
