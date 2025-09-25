@@ -1,7 +1,7 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 include_once '../config/db_connect.php';
@@ -10,6 +10,33 @@ $db = $database->getConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// --- GET: fetch vendor status ---
+if ($method === 'GET' && isset($_GET['event_id']) && isset($_GET['vendor_id'])) {
+    $query = "SELECT status, event_receipt_url 
+              FROM event_vendors 
+              WHERE event_id = :event_id AND vendor_id = :vendor_id
+              LIMIT 1";
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(":event_id", $_GET['event_id']);
+    $stmt->bindParam(":vendor_id", $_GET['vendor_id']);
+    $stmt->execute();
+
+    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        echo json_encode([
+            "success" => true,
+            "vendor_status" => $row['status'],
+            "receipt_url" => $row['event_receipt_url']
+        ]);
+    } else {
+        echo json_encode([
+            "success" => false,
+            "vendor_status" => null
+        ]);
+    }
+    exit;
+}
+
+// --- POST: apply or upload receipt ---
 if ($method === "POST") {
     $data = json_decode(file_get_contents("php://input"), true);
 
