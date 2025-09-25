@@ -13,7 +13,7 @@ $vendorId = isset($_GET['vendor_id']) ? $_GET['vendor_id'] : null;
 
 try {
     if ($type === "joined" && $vendorId) {
-        // Use event_vendors join for joined tab
+        // Events that the vendor already joined
         $query = "SELECT 
                     e.id,
                     e.name,
@@ -21,16 +21,19 @@ try {
                     e.schedule_start,
                     e.schedule_end,
                     e.max_slots,
-                    e.slots_taken
+                    e.slots_taken,
+                    ve.status AS vendor_status,
+                    ve.event_receipt_url
                   FROM events e
-                  INNER JOIN event_vendors ve ON e.id = ve.event_id
+                  INNER JOIN event_vendors ve 
+                          ON e.id = ve.event_id
                   WHERE ve.vendor_id = :vendor_id
                   ORDER BY e.schedule_start ASC";
 
         $stmt = $db->prepare($query);
         $stmt->bindParam(":vendor_id", $vendorId);
     } else {
-        // Use events table only for upcoming/past/all
+        // Upcoming / Past / All events (with vendor status if vendorId provided)
         $query = "SELECT 
                     e.id,
                     e.created_by,
@@ -44,10 +47,12 @@ try {
                     e.requirements,
                     e.booth_fee,
                     e.max_slots,
-                    e.slots_taken
+                    e.slots_taken,
+                    ve.status AS vendor_status,
+                    ve.event_receipt_url
                 FROM events e
+                " . ($vendorId ? "LEFT JOIN event_vendors ve ON e.id = ve.event_id AND ve.vendor_id = :vendor_id " : "") . "
                 WHERE 1=1 ";
-
 
         if ($type === "upcoming") {
             $query .= "AND e.schedule_start >= NOW() ";
@@ -57,6 +62,10 @@ try {
 
         $query .= "ORDER BY e.schedule_start ASC";
         $stmt = $db->prepare($query);
+
+        if ($vendorId) {
+            $stmt->bindParam(":vendor_id", $vendorId);
+        }
     }
 
     $stmt->execute();
