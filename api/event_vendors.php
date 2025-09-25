@@ -39,6 +39,7 @@ if ($method === 'GET' && isset($_GET['event_id']) && isset($_GET['vendor_id'])) 
 // --- POST: apply or upload receipt ---
 if ($method === "POST") {
     $data = json_decode(file_get_contents("php://input"), true);
+    error_log("POST /event_vendors.php received: " . json_encode($data));
 
     $event_id = $data['event_id'] ?? null;
     $vendor_id = $data['vendor_id'] ?? null;
@@ -85,10 +86,17 @@ if ($method === "POST") {
                 ":status" => $status
             ]);
 
-            echo json_encode([
-                "success" => true,
-                "message" => "Application recorded"
-            ]);
+            if ($stmt->rowCount() > 0) {
+                echo json_encode([
+                    "success" => true,
+                    "message" => "Application recorded"
+                ]);
+            } else {
+                echo json_encode([
+                    "success" => false,
+                    "error" => "No rows affected (duplicate with same status?)"
+                ]);
+            }
         }
     } catch (Exception $e) {
         echo json_encode([
