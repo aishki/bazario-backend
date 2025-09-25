@@ -16,26 +16,6 @@ try {
         // Events that the vendor already joined
         $query = "SELECT 
                     e.id,
-                    e.name,
-                    e.venue,
-                    e.schedule_start,
-                    e.schedule_end,
-                    e.max_slots,
-                    e.slots_taken,
-                    ve.status AS vendor_status,
-                    ve.event_receipt_url
-                  FROM events e
-                  INNER JOIN event_vendors ve 
-                          ON e.id = ve.event_id
-                  WHERE ve.vendor_id = :vendor_id
-                  ORDER BY e.schedule_start ASC";
-
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(":vendor_id", $vendorId);
-    } else {
-        // Upcoming / Past / All events (with vendor status if vendorId provided)
-        $query = "SELECT 
-                    e.id,
                     e.created_by,
                     e.name,
                     e.description,
@@ -50,6 +30,39 @@ try {
                     e.slots_taken,
                     ve.status AS vendor_status,
                     ve.event_receipt_url
+                  FROM events e
+                  INNER JOIN event_vendors ve 
+                          ON e.id = ve.event_id
+                  WHERE ve.vendor_id = :vendor_id
+                  ORDER BY e.schedule_start ASC";
+
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(":vendor_id", $vendorId);
+    } else {
+        // Base SELECT (always these columns)
+        $query = "SELECT 
+                    e.id,
+                    e.created_by,
+                    e.name,
+                    e.description,
+                    e.venue,
+                    e.poster_url,
+                    e.schedule_start,
+                    e.schedule_end,
+                    e.created_at,
+                    e.requirements,
+                    e.booth_fee,
+                    e.max_slots,
+                    e.slots_taken";
+
+        // Add vendor columns only if vendorId is passed
+        if ($vendorId) {
+            $query .= ",
+                    ve.status AS vendor_status,
+                    ve.event_receipt_url";
+        }
+
+        $query .= "
                 FROM events e
                 " . ($vendorId ? "LEFT JOIN event_vendors ve ON e.id = ve.event_id AND ve.vendor_id = :vendor_id " : "") . "
                 WHERE 1=1 ";
@@ -61,6 +74,7 @@ try {
         }
 
         $query .= "ORDER BY e.schedule_start ASC";
+
         $stmt = $db->prepare($query);
 
         if ($vendorId) {
