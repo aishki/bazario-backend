@@ -55,7 +55,7 @@ if ($method === "POST") {
 
     try {
         if ($receipt_url) {
-            // Update existing record with receipt
+            // ✅ Update status and receipt if record exists
             $stmt = $db->prepare("
                 UPDATE event_vendors
                 SET event_receipt_url = :receipt_url, status = :status
@@ -70,14 +70,14 @@ if ($method === "POST") {
 
             echo json_encode([
                 "success" => true,
-                "message" => "Receipt uploaded"
+                "message" => "Receipt uploaded/updated"
             ]);
         } else {
-            // Insert a new application (avoid duplicates using ON CONFLICT)
+            // ✅ Insert new record or update if already exists
             $stmt = $db->prepare("
                 INSERT INTO event_vendors (event_id, vendor_id, status)
                 VALUES (:event_id, :vendor_id, :status)
-                ON CONFLICT (event_id, vendor_id) DO NOTHING
+                ON DUPLICATE KEY UPDATE status = VALUES(status)
             ");
             $stmt->execute([
                 ":event_id" => $event_id,
@@ -87,7 +87,7 @@ if ($method === "POST") {
 
             echo json_encode([
                 "success" => true,
-                "message" => "Applied"
+                "message" => "Application recorded"
             ]);
         }
     } catch (Exception $e) {
@@ -96,9 +96,11 @@ if ($method === "POST") {
             "error" => $e->getMessage()
         ]);
     }
-} else {
-    echo json_encode([
-        "success" => false,
-        "error" => "Invalid request method"
-    ]);
+    exit;
 }
+
+// --- Fallback ---
+echo json_encode([
+    "success" => false,
+    "error" => "Invalid request method"
+]);
