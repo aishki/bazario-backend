@@ -86,17 +86,10 @@ if ($method === "POST") {
                 ":status" => $status
             ]);
 
-            if ($stmt->rowCount() > 0) {
-                echo json_encode([
-                    "success" => true,
-                    "message" => "Application recorded"
-                ]);
-            } else {
-                echo json_encode([
-                    "success" => false,
-                    "error" => "No rows affected (duplicate with same status?)"
-                ]);
-            }
+            echo json_encode([
+                "success" => true,
+                "message" => "Application recorded/updated"
+            ]);
         }
     } catch (Exception $e) {
         echo json_encode([
