@@ -79,9 +79,9 @@ if ($data->action == "login") {
         echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
     }
 } elseif ($data->action == "register") {
-    if (empty($data->email) || empty($data->password) || empty($data->first_name) || empty($data->last_name) || empty($data->username)) {
+    if (empty($data->email) || empty($data->password) || empty($data->username) || empty($data->phone)) {
         http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "Email, password, first name, last name, and username are required"]);
+        echo json_encode(["status" => "error", "message" => "Email, password, username, and phone number are required"]);
         exit;
     }
 
@@ -137,9 +137,9 @@ if ($data->action == "login") {
                                    VALUES (:id, :first_name, :middle_name, :last_name, :suffix, :phone_number, :address, :city, :postal_code, :created_at)";
                     $database->executeQuery($customer_sql, [
                         ':id' => $user_id,
-                        ':first_name' => $data->first_name,
+                        ':first_name' => $data->first_name ?? null,
                         ':middle_name' => $data->middle_name ?? null,
-                        ':last_name' => $data->last_name,
+                        ':last_name' => $data->last_name ?? null,
                         ':suffix' => $data->suffix ?? null,
                         ':phone_number' => $data->phone ?? null,
                         ':address' => $data->address ?? null,
@@ -171,9 +171,9 @@ if ($data->action == "login") {
                                   VALUES (:id, :first_name, :middle_name, :last_name, :suffix, :phone_number, :email, :position, :created_at)";
                     $database->executeQuery($contact_sql, [
                         ':id' => $user_id,
-                        ':first_name' => $data->first_name,
+                        ':first_name' => $data->first_name ?? null,
                         ':middle_name' => $data->middle_name ?? null,
-                        ':last_name' => $data->last_name,
+                        ':last_name' => $data->last_name ?? null,
                         ':suffix' => $data->suffix ?? null,
                         ':phone_number' => $data->phone ?? null,
                         ':email' => $data->email,
@@ -202,6 +202,92 @@ if ($data->action == "login") {
         if ($db->inTransaction()) {
             $db->rollback();
         }
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+    }
+} elseif ($data->action == "check_username") {
+    if (empty($data->username)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Username is required"]);
+        exit;
+    }
+
+    try {
+        $sql = "SELECT COUNT(*) as count FROM users WHERE username = :username";
+        $stmt = $database->executeQuery($sql, [':username' => $data->username]);
+        $result = $stmt->fetch();
+
+        if ($result['count'] > 0) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Username is already taken"
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "success",
+                "message" => "Username is available"
+            ]);
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+    }
+} elseif ($data->action == "check_email") {
+    if (empty($data->email)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Email is required"]);
+        exit;
+    }
+
+    try {
+        $sql = "SELECT COUNT(*) as count FROM users WHERE email = :email";
+        $stmt = $database->executeQuery($sql, [':email' => $data->email]);
+        $result = $stmt->fetch();
+
+        if ($result['count'] > 0) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Email is already taken"
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "success",
+                "message" => "Email is available"
+            ]);
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+    }
+} elseif ($data->action == "check_phone") {
+    if (empty($data->phone)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Phone number is required"]);
+        exit;
+    }
+
+    try {
+        // Check in both customers and vendor_contacts tables
+        $sql = "SELECT COUNT(*) as count FROM (
+                    SELECT phone_number FROM customers WHERE phone_number = :phone
+                    UNION
+                    SELECT phone_number FROM vendor_contacts WHERE phone_number = :phone
+                ) as phone_check";
+        $stmt = $database->executeQuery($sql, [':phone' => $data->phone]);
+        $result = $stmt->fetch();
+
+        if ($result['count'] > 0) {
+            echo json_encode([
+                "status" => "error",
+                "message" => "Phone number is already taken"
+            ]);
+        } else {
+            echo json_encode([
+                "status" => "success",
+                "message" => "Phone number is available"
+            ]);
+        }
+    } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
     }
