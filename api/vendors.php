@@ -50,15 +50,30 @@ switch ($method) {
                     $vendor['social_links'] = json_decode($vendor['social_links'], true);
                 }
 
-                echo json_encode(array(
+                // Nest contact info
+                $vendor['contact'] = [
+                    "first_name"   => $vendor['first_name'],
+                    "last_name"    => $vendor['last_name'],
+                    "suffix"       => $vendor['suffix'],
+                    "phone_number" => $vendor['phone_number'],
+                    "email"        => $vendor['contact_email'],
+                    "position"     => $vendor['position'],
+                ];
+
+                // Remove flat contact fields
+                unset(
+                    $vendor['first_name'],
+                    $vendor['last_name'],
+                    $vendor['suffix'],
+                    $vendor['phone_number'],
+                    $vendor['contact_email'],
+                    $vendor['position']
+                );
+
+                echo json_encode([
                     "success" => true,
-                    "vendor" => $vendor
-                ));
-            } else {
-                echo json_encode(array(
-                    "success" => false,
-                    "message" => "Vendor not found"
-                ));
+                    "vendor"  => $vendor
+                ]);
             }
         } else {
             // Get all vendors (for listing)
