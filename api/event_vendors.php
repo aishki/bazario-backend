@@ -45,7 +45,7 @@ if ($method === "POST") {
 
     $event_id = $data['event_id'] ?? null;
     $vendor_id = $data['vendor_id'] ?? null;
-    $status = $data['status'] ?? "applied";
+    $status = $data['status'] ?? "pending";
     $receipt_url = $data['event_receipt_url'] ?? null;
 
     if (!$event_id || !$vendor_id) {
