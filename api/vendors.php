@@ -62,10 +62,18 @@ switch ($method) {
             }
         } else {
             // Get all vendors (for listing)
-            $query = "SELECT v.id AS vendor_id, v.business_name, v.description, v.logo_url, 
-                             v.verified, v.business_category, v.created_at
-                      FROM vendors v 
+            $query = "SELECT v.id AS vendor_id, 
+                            v.business_name, 
+                            v.description, 
+                            v.logo_url, 
+                            v.verified, 
+                            v.business_category, 
+                            v.created_at,
+                            vc.phone_number
+                      FROM vendors v
+                      LEFT JOIN vendor_contacts vc ON v.id = vc.id
                       ORDER BY v.created_at DESC";
+
 
             $stmt = $db->prepare($query);
             $stmt->execute();
