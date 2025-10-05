@@ -40,6 +40,61 @@ switch ($method) {
         }
         break;
 
+    case 'POST':
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (!isset($data['vendor_id']) || !isset($data['name'])) {
+            echo json_encode([
+                "success" => false,
+                "message" => "vendor_id and name are required"
+            ]);
+            exit;
+        }
+
+        // Check if vendor already has 5 products
+        $checkQuery = "SELECT COUNT(*) as product_count FROM vendor_products WHERE vendor_id = :vendor_id";
+        $checkStmt = $db->prepare($checkQuery);
+        $checkStmt->bindParam(':vendor_id', $data['vendor_id']);
+        $checkStmt->execute();
+        $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($result['product_count'] >= 5) {
+            echo json_encode([
+                "success" => false,
+                "message" => "You can only feature 5 top products for your shop! Delete an existing product first to replace them."
+            ]);
+            exit;
+        }
+
+        $query = "INSERT INTO vendor_products (vendor_id, name, description, image_url, is_featured)
+                  VALUES (:vendor_id, :name, :description, :image_url, :is_featured)
+                  RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
+
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':vendor_id', $data['vendor_id']);
+        $stmt->bindParam(':name', $data['name']);
+        $description = $data['description'] ?? null;
+        $stmt->bindParam(':description', $description);
+        $image_url = $data['image_url'] ?? null;
+        $stmt->bindParam(':image_url', $image_url);
+        $is_featured = $data['is_featured'] ?? false;
+        $stmt->bindParam(':is_featured', $is_featured);
+
+        if ($stmt->execute()) {
+            $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
+            echo json_encode([
+                "success" => true,
+                "message" => "Product created successfully",
+                "product" => $newProduct
+            ]);
+        } else {
+            echo json_encode([
+                "success" => false,
+                "message" => "Failed to create product"
+            ]);
+        }
+        break;
+
     case 'PUT':
         $data = json_decode(file_get_contents("php://input"), true);
 
