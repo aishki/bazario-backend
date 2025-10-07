@@ -44,10 +44,14 @@ if ($data->action == "login") {
                     "token" => $token
                 ];
 
-                if ($user['role'] === 'customer' && !empty($user['first_name'])) {
-                    $response['first_name'] = $user['first_name'];
-                    $response['last_name'] = $user['last_name'];
+                if ($user['role'] === 'customer') {
+                    $response['customer_id'] = $user['id'];
+                    if (!empty($user['first_name'])) {
+                        $response['first_name'] = $user['first_name'];
+                        $response['last_name'] = $user['last_name'];
+                    }
                 }
+
 
                 if ($user['role'] === 'vendor' && !empty($user['vendor_id'])) {
                     $response['vendor_id'] = $user['vendor_id'];
@@ -153,6 +157,8 @@ if ($data->action == "login") {
                         ':customer_id' => $user_id,
                         ':created_at' => $now
                     ]);
+
+                    $response['customer_id'] = $user_id;
                 } elseif ($role === 'vendor') {
                     // Insert into vendors table
                     $business_name = !empty($data->business_name) ? $data->business_name : "New Business";
