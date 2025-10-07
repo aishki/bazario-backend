@@ -25,6 +25,7 @@ switch ($method) {
                         u.id,
                         u.username,
                         u.email,
+                        c.id AS customer_id,
                         c.first_name,
                         c.middle_name,
                         c.last_name,
