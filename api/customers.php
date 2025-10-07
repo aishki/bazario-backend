@@ -26,6 +26,7 @@ switch ($method) {
                         u.username,
                         u.email,
                         c.id AS customer_id,
+                        c.profile_url,
                         c.first_name,
                         c.middle_name,
                         c.last_name,
@@ -65,6 +66,7 @@ switch ($method) {
                         c.middle_name,
                         c.last_name,
                         c.suffix,
+                        c.profile_url,
                         c.phone_number,
                         c.address,
                         c.city,
@@ -180,6 +182,9 @@ switch ($method) {
             $params = [":customer_id" => $data->customer_id];
 
             $fields = [
+                "profile_url",
+                "username",
+                "email",
                 "first_name",
                 "middle_name",
                 "last_name",
