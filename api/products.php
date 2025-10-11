@@ -2,14 +2,13 @@
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 
-include '../config/db_connect.php';
-
-$category = isset($_GET['category']) ? $_GET['category'] : 'all';
+require_once '../config/db_connect.php';
 
 try {
-    // ✅ Initialize database connection
-    $database = new Database();
-    $pdo = $database->getConnection();
+    $db = new Database();
+    $pdo = $db->getConnection();
+
+    $category = isset($_GET['category']) ? $_GET['category'] : 'all';
 
     if ($category === 'all') {
         $query = "SELECT * FROM products ORDER BY created_at DESC";
@@ -24,7 +23,13 @@ try {
 
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    echo json_encode($products);
-} catch (Exception $e) {
-    echo json_encode(["error" => $e->getMessage()]);
+    echo json_encode([
+        "success" => true,
+        "products" => $products
+    ]);
+} catch (PDOException $e) {
+    echo json_encode([
+        "success" => false,
+        "error" => $e->getMessage()
+    ]);
 }
