@@ -38,6 +38,27 @@ try {
 
         $stmt = $db->prepare($query);
         $stmt->bindParam(":vendor_id", $vendorId);
+    } elseif ($type === "random") {
+        // ✅ Random 3 events only
+        $query = "SELECT 
+                    e.id,
+                    e.created_by,
+                    e.name,
+                    e.description,
+                    e.venue,
+                    e.poster_url,
+                    e.schedule_start,
+                    e.schedule_end,
+                    e.created_at
+                  FROM events e
+                  ORDER BY RANDOM()
+                  LIMIT 3";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(["success" => true, "events" => $events]);
+        exit;
     } else {
         // Base SELECT (always these columns)
         $query = "SELECT 
