@@ -1,0 +1,149 @@
+<?php
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+
+include_once '../config/db_connect.php';
+$database = new Database();
+$db = $database->getConnection();
+$method = $_SERVER['REQUEST_METHOD'];
+
+switch ($method) {
+
+    // -------------------------------------------------------------
+    // GET - Fetch orders (with items)
+    // -------------------------------------------------------------
+    case 'GET':
+        if (!isset($_GET['customer_id'])) {
+            echo json_encode(["success" => false, "message" => "customer_id required"]);
+            exit;
+        }
+
+        $customer_id = $_GET['customer_id'];
+        $query = "SELECT * FROM orders WHERE customer_id = :cid ORDER BY created_at DESC";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':cid', $customer_id);
+        $stmt->execute();
+        $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($orders as &$order) {
+            $items_stmt = $db->prepare("SELECT oi.*, p.name, p.image_url 
+                                        FROM order_items oi
+                                        JOIN products p ON oi.product_id = p.id
+                                        WHERE order_id = :oid");
+            $items_stmt->bindParam(':oid', $order['id']);
+            $items_stmt->execute();
+            $order['items'] = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        echo json_encode(["success" => true, "orders" => $orders]);
+        break;
+
+    // -------------------------------------------------------------
+    // POST - Place a new order (move items from cart)
+    // -------------------------------------------------------------
+    case 'POST':
+        $data = json_decode(file_get_contents("php://input"));
+        if (!isset($data->customer_id)) {
+            echo json_encode(["success" => false, "message" => "customer_id required"]);
+            exit;
+        }
+
+        try {
+            $db->beginTransaction();
+
+            // Get cart and items
+            $cart_stmt = $db->prepare("SELECT id FROM cart WHERE customer_id = :cid LIMIT 1");
+            $cart_stmt->bindParam(':cid', $data->customer_id);
+            $cart_stmt->execute();
+            $cart = $cart_stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$cart) throw new Exception("Cart not found");
+
+            $cart_id = $cart['id'];
+            $items_stmt = $db->prepare("SELECT ci.*, p.price FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.cart_id = :cid");
+            $items_stmt->bindParam(':cid', $cart_id);
+            $items_stmt->execute();
+            $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($items)) throw new Exception("Cart is empty");
+
+            // Compute total
+            $total = 0;
+            foreach ($items as $it) {
+                $total += $it['price'] * $it['quantity'];
+            }
+
+            // Create order
+            $order_stmt = $db->prepare("INSERT INTO orders (customer_id, total_amount, status) 
+                                        VALUES (:cid, :total, 'pending') RETURNING id");
+            $order_stmt->bindParam(':cid', $data->customer_id);
+            $order_stmt->bindParam(':total', $total);
+            $order_stmt->execute();
+            $order = $order_stmt->fetch(PDO::FETCH_ASSOC);
+            $order_id = $order['id'];
+
+            // Insert items
+            $insert_item = $db->prepare("INSERT INTO order_items (order_id, product_id, quantity, price)
+                                         VALUES (:oid, :pid, :q, :p)");
+            foreach ($items as $it) {
+                $insert_item->bindParam(':oid', $order_id);
+                $insert_item->bindParam(':pid', $it['product_id']);
+                $insert_item->bindParam(':q', $it['quantity']);
+                $insert_item->bindParam(':p', $it['price']);
+                $insert_item->execute();
+            }
+
+            // Clear cart
+            $clear_cart = $db->prepare("DELETE FROM cart_items WHERE cart_id = :cid");
+            $clear_cart->bindParam(':cid', $cart_id);
+            $clear_cart->execute();
+
+            $db->commit();
+            echo json_encode(["success" => true, "message" => "Order placed successfully", "order_id" => $order_id]);
+        } catch (Exception $e) {
+            $db->rollback();
+            echo json_encode(["success" => false, "message" => "Error: " . $e->getMessage()]);
+        }
+        break;
+
+    // -------------------------------------------------------------
+    // PUT - Update order status
+    // -------------------------------------------------------------
+    case 'PUT':
+        $data = json_decode(file_get_contents("php://input"));
+        if (!isset($data->order_id) || !isset($data->status)) {
+            echo json_encode(["success" => false, "message" => "order_id and status required"]);
+            exit;
+        }
+
+        $update = $db->prepare("UPDATE orders SET status = :s WHERE id = :id");
+        $update->bindParam(':s', $data->status);
+        $update->bindParam(':id', $data->order_id);
+        $update->execute();
+
+        echo json_encode(["success" => true, "message" => "Order status updated"]);
+        break;
+
+    // -------------------------------------------------------------
+    // DELETE - Cancel or remove order
+    // -------------------------------------------------------------
+    case 'DELETE':
+        $data = json_decode(file_get_contents("php://input"));
+        if (!isset($data->order_id)) {
+            echo json_encode(["success" => false, "message" => "order_id required"]);
+            exit;
+        }
+
+        $del = $db->prepare("DELETE FROM orders WHERE id = :id");
+        $del->bindParam(':id', $data->order_id);
+        $del->execute();
+
+        echo json_encode(["success" => true, "message" => "Order deleted"]);
+        break;
+
+    default:
+        echo json_encode(["success" => false, "message" => "Method not allowed"]);
+        break;
+}
