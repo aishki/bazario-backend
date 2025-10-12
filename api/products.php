@@ -12,20 +12,22 @@ try {
 
     // Build the base query with JOINs
     $baseQuery = "
-        SELECT 
-            p.id,
-            p.name,
-            p.description,
-            p.price,
-            p.image_url,
-            p.stock,
-            p.created_at,
-            p.category,
-            v.business_name AS business_partner_name,
-            v.logo_url AS business_logo
-        FROM products p
-        LEFT JOIN business_partners bp ON p.business_partner_id = bp.id
-        LEFT JOIN vendors v ON bp.vendor_id = v.id
+    SELECT 
+        p.id,
+        p.business_partner_id,
+        p.added_by,
+        p.name,
+        p.description,
+        p.price,
+        p.image_url,
+        p.stock,
+        p.created_at,
+        p.category,
+        v.business_name AS business_partner_name,
+        v.logo_url AS business_logo
+    FROM products p
+    LEFT JOIN business_partners bp ON p.business_partner_id = bp.id
+    LEFT JOIN vendors v ON bp.vendor_id = v.id
     ";
 
     // If 'all', fetch all; otherwise filter by category
