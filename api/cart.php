@@ -154,6 +154,9 @@ switch ($method) {
     // -------------------------------------------------------------
     // DELETE - Clear the entire cart
     // -------------------------------------------------------------
+    // -------------------------------------------------------------
+    // DELETE - Clear the entire cart OR delete specific items
+    // -------------------------------------------------------------
     case 'DELETE':
         $data = json_decode(file_get_contents("php://input"));
         if (!isset($data->customer_id)) {
@@ -162,15 +165,33 @@ switch ($method) {
         }
 
         try {
-            $stmt = $db->prepare("DELETE FROM cart_items WHERE cart_id = (SELECT id FROM cart WHERE customer_id = :cid)");
-            $stmt->bindParam(':cid', $data->customer_id);
-            $stmt->execute();
+            if (!empty($data->cart_item_ids)) {
+                // 🧩 Delete only selected cart items
+                $placeholders = implode(',', array_fill(0, count($data->cart_item_ids), '?'));
+                $sql = "DELETE FROM cart_items WHERE id IN ($placeholders)";
+                $stmt = $db->prepare($sql);
+                $stmt->execute($data->cart_item_ids);
 
-            echo json_encode(["success" => true, "message" => "Cart cleared"]);
+                echo json_encode([
+                    "success" => true,
+                    "message" => "Selected cart items deleted successfully"
+                ]);
+            } else {
+                // 🧹 Clear entire cart if no specific IDs provided
+                $stmt = $db->prepare("DELETE FROM cart_items WHERE cart_id = (SELECT id FROM cart WHERE customer_id = :cid)");
+                $stmt->bindParam(':cid', $data->customer_id);
+                $stmt->execute();
+
+                echo json_encode([
+                    "success" => true,
+                    "message" => "Entire cart cleared successfully"
+                ]);
+            }
         } catch (Exception $e) {
             echo json_encode(["success" => false, "message" => "Error: " . $e->getMessage()]);
         }
         break;
+
 
     default:
         echo json_encode(["success" => false, "message" => "Method not allowed"]);
