@@ -250,7 +250,7 @@ switch ($method) {
         break;
 
     case 'POST':
-        echo json_encode(array("message" => "Vendor creation endpoint - to be implemented"));
+        // echo json_encode(array("message" => "Vendor creation endpoint - to be implemented"));
         break;
 
     default:
