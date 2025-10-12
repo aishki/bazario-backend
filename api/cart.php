@@ -38,10 +38,20 @@ switch ($method) {
         }
 
         // Fetch items
-        $item_query = "SELECT ci.id AS cart_item_id, ci.quantity, p.id AS product_id, p.name, p.price, p.image_url
+        $item_query = "SELECT 
+                         ci.id AS cart_item_id,
+                         ci.quantity,
+                         p.id AS product_id,
+                         p.name,
+                         p.price,
+                         p.image_url,
+                         v.business_name
                        FROM cart_items ci
                        JOIN products p ON ci.product_id = p.id
-                       WHERE ci.cart_id = :cart_id";
+                       LEFT JOIN business_partners bp ON p.business_partner_id = bp.id
+                       LEFT JOIN vendors v ON bp.vendor_id = v.id
+                       WHERE ci.cart_id = :cart_id
+";
         $item_stmt = $db->prepare($item_query);
         $item_stmt->bindParam(':cart_id', $cart['id']);
         $item_stmt->execute();
