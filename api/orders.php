@@ -53,21 +53,37 @@ switch ($method) {
         try {
             $db->beginTransaction();
 
-            // Get cart and items
+            // Get cart id
             $cart_stmt = $db->prepare("SELECT id FROM cart WHERE customer_id = :cid LIMIT 1");
             $cart_stmt->bindParam(':cid', $data->customer_id);
             $cart_stmt->execute();
             $cart = $cart_stmt->fetch(PDO::FETCH_ASSOC);
-
             if (!$cart) throw new Exception("Cart not found");
 
             $cart_id = $cart['id'];
-            $items_stmt = $db->prepare("SELECT ci.*, p.price FROM cart_items ci JOIN products p ON ci.product_id = p.id WHERE ci.cart_id = :cid");
-            $items_stmt->bindParam(':cid', $cart_id);
-            $items_stmt->execute();
+
+            // ✅ Only include selected cart_item_ids (if provided)
+            $item_ids = isset($data->cart_item_ids) && is_array($data->cart_item_ids)
+                ? $data->cart_item_ids
+                : [];
+
+            if (empty($item_ids)) throw new Exception("No items selected");
+
+            // ✅ Use placeholders for prepared statement
+            $placeholders = implode(',', array_fill(0, count($item_ids), '?'));
+
+            // Fetch only selected items
+            $items_stmt = $db->prepare("
+            SELECT ci.*, p.price 
+            FROM cart_items ci 
+            JOIN products p ON ci.product_id = p.id 
+            WHERE ci.cart_id = ? AND ci.id IN ($placeholders)
+        ");
+            $params = array_merge([$cart_id], $item_ids);
+            $items_stmt->execute($params);
             $items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            if (empty($items)) throw new Exception("Cart is empty");
+            if (empty($items)) throw new Exception("No valid cart items found");
 
             // Compute total
             $total = 0;
@@ -76,8 +92,10 @@ switch ($method) {
             }
 
             // Create order
-            $order_stmt = $db->prepare("INSERT INTO orders (customer_id, total_amount, status) 
-                                        VALUES (:cid, :total, 'pending') RETURNING id");
+            $order_stmt = $db->prepare("
+            INSERT INTO orders (customer_id, total_amount, status) 
+            VALUES (:cid, :total, 'pending') RETURNING id
+        ");
             $order_stmt->bindParam(':cid', $data->customer_id);
             $order_stmt->bindParam(':total', $total);
             $order_stmt->execute();
@@ -85,8 +103,10 @@ switch ($method) {
             $order_id = $order['id'];
 
             // Insert items
-            $insert_item = $db->prepare("INSERT INTO order_items (order_id, product_id, quantity, price)
-                                         VALUES (:oid, :pid, :q, :p)");
+            $insert_item = $db->prepare("
+            INSERT INTO order_items (order_id, product_id, quantity, price)
+            VALUES (:oid, :pid, :q, :p)
+        ");
             foreach ($items as $it) {
                 $insert_item->bindParam(':oid', $order_id);
                 $insert_item->bindParam(':pid', $it['product_id']);
@@ -95,10 +115,13 @@ switch ($method) {
                 $insert_item->execute();
             }
 
-            // Clear cart
-            $clear_cart = $db->prepare("DELETE FROM cart_items WHERE cart_id = :cid");
-            $clear_cart->bindParam(':cid', $cart_id);
-            $clear_cart->execute();
+            // ✅ Clear only those selected items
+            $delete_placeholders = implode(',', array_fill(0, count($item_ids), '?'));
+            $clear_cart = $db->prepare("
+            DELETE FROM cart_items 
+            WHERE cart_id = ? AND id IN ($delete_placeholders)
+        ");
+            $clear_cart->execute($params);
 
             $db->commit();
             echo json_encode(["success" => true, "message" => "Order placed successfully", "order_id" => $order_id]);
@@ -107,6 +130,7 @@ switch ($method) {
             echo json_encode(["success" => false, "message" => "Error: " . $e->getMessage()]);
         }
         break;
+
 
     // -------------------------------------------------------------
     // PUT - Update order status
