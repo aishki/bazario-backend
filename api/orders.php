@@ -28,22 +28,30 @@ switch ($method) {
         $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($orders as &$order) {
-            // Get all items with their business info
+            // 🧩 Fetch items and include vendor (business) name
             $items_stmt = $db->prepare("
-            SELECT oi.*, p.name, p.image_url, p.business_id, b.business_name
+            SELECT 
+                oi.id AS order_item_id,
+                oi.product_id,
+                oi.quantity,
+                oi.price,
+                p.name,
+                p.image_url,
+                v.business_name
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
-            JOIN businesses b ON p.business_id = b.id
-            WHERE order_id = :oid
+            LEFT JOIN business_partners bp ON p.business_partner_id = bp.id
+            LEFT JOIN vendors v ON bp.vendor_id = v.id
+            WHERE oi.order_id = :oid
         ");
             $items_stmt->bindParam(':oid', $order['id']);
             $items_stmt->execute();
             $all_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Group by business_name
+            // 🧩 Group items by business_name
             $grouped = [];
             foreach ($all_items as $item) {
-                $biz = $item['business_name'];
+                $biz = $item['business_name'] ?? 'Unknown Vendor';
                 if (!isset($grouped[$biz])) {
                     $grouped[$biz] = [
                         "business_name" => $biz,
@@ -51,7 +59,7 @@ switch ($method) {
                     ];
                 }
                 $grouped[$biz]["items"][] = [
-                    "order_item_id" => $item['id'],
+                    "order_item_id" => $item['order_item_id'],
                     "product_id" => $item['product_id'],
                     "quantity" => $item['quantity'],
                     "price" => $item['price'],
