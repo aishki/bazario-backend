@@ -28,17 +28,46 @@ switch ($method) {
         $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($orders as &$order) {
-            $items_stmt = $db->prepare("SELECT oi.*, p.name, p.image_url 
-                                        FROM order_items oi
-                                        JOIN products p ON oi.product_id = p.id
-                                        WHERE order_id = :oid");
+            // Get all items with their business info
+            $items_stmt = $db->prepare("
+            SELECT oi.*, p.name, p.image_url, p.business_id, b.business_name
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            JOIN businesses b ON p.business_id = b.id
+            WHERE order_id = :oid
+        ");
             $items_stmt->bindParam(':oid', $order['id']);
             $items_stmt->execute();
-            $order['items'] = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $all_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Group by business_name
+            $grouped = [];
+            foreach ($all_items as $item) {
+                $biz = $item['business_name'];
+                if (!isset($grouped[$biz])) {
+                    $grouped[$biz] = [
+                        "business_name" => $biz,
+                        "items" => []
+                    ];
+                }
+                $grouped[$biz]["items"][] = [
+                    "order_item_id" => $item['id'],
+                    "product_id" => $item['product_id'],
+                    "quantity" => $item['quantity'],
+                    "price" => $item['price'],
+                    "name" => $item['name'],
+                    "image_url" => $item['image_url']
+                ];
+            }
+
+            // Replace items list with grouped version
+            $order['shops'] = array_values($grouped);
+            unset($order['items']);
         }
 
         echo json_encode(["success" => true, "orders" => $orders]);
         break;
+
 
     // -------------------------------------------------------------
     // POST - Place a new order (move items from cart)
