@@ -30,19 +30,19 @@ switch ($method) {
         foreach ($orders as &$order) {
             // 🧩 Fetch items and include vendor (business) name
             $items_stmt = $db->prepare("
-            SELECT 
-                oi.id AS order_item_id,
-                oi.product_id,
-                oi.quantity,
-                oi.price,
-                p.name,
-                p.image_url,
-                v.business_name
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            LEFT JOIN business_partners bp ON p.business_partner_id = bp.id
-            LEFT JOIN vendors v ON bp.vendor_id = v.id
-            WHERE oi.order_id = :oid
+                SELECT 
+                    oi.id AS order_item_id,
+                    oi.product_id,
+                    oi.quantity,
+                    oi.price,
+                    p.name,
+                    p.image_url,
+                    v.business_name
+                FROM order_items oi
+                JOIN products p ON oi.product_id = p.id
+                LEFT JOIN business_partners bp ON p.business_partner_id = bp.id
+                LEFT JOIN vendors v ON bp.vendor_id = v.id
+                WHERE oi.order_id = :oid
         ");
             $items_stmt->bindParam(':oid', $order['id']);
             $items_stmt->execute();
@@ -111,10 +111,10 @@ switch ($method) {
 
             // Fetch only selected items
             $items_stmt = $db->prepare("
-            SELECT ci.*, p.price 
-            FROM cart_items ci 
-            JOIN products p ON ci.product_id = p.id 
-            WHERE ci.cart_id = ? AND ci.id IN ($placeholders)
+                SELECT ci.*, p.price 
+                FROM cart_items ci 
+                JOIN products p ON ci.product_id = p.id 
+                WHERE ci.cart_id = ? AND ci.id IN ($placeholders)
         ");
             $params = array_merge([$cart_id], $item_ids);
             $items_stmt->execute($params);
@@ -134,20 +134,24 @@ switch ($method) {
 
             // Create order
             $order_stmt = $db->prepare("
-            INSERT INTO orders (customer_id, total_amount, status, delivery_fee) 
-            VALUES (:cid, :total, 'pending', :delivery_fee)
-            RETURNING id
-        ");
+                INSERT INTO orders (customer_id, total_amount, status, delivery_fee) 
+                VALUES (:cid, :total, 'pending', :delivery_fee)
+                RETURNING id
+            ");
             $order_stmt->bindParam(':cid', $data->customer_id);
             $order_stmt->bindParam(':total', $total);
             $order_stmt->bindParam(':delivery_fee', $delivery_fee);
             $order_stmt->execute();
 
+            // ✅ Fetch the new order ID
+            $order_row = $order_stmt->fetch(PDO::FETCH_ASSOC);
+            $order_id = $order_row['id'];
+
             // Insert items
             $insert_item = $db->prepare("
-            INSERT INTO order_items (order_id, product_id, quantity, price)
-            VALUES (:oid, :pid, :q, :p)
-        ");
+                INSERT INTO order_items (order_id, product_id, quantity, price)
+                VALUES (:oid, :pid, :q, :p)
+            ");
             foreach ($items as $it) {
                 $insert_item->bindParam(':oid', $order_id);
                 $insert_item->bindParam(':pid', $it['product_id']);
@@ -159,8 +163,8 @@ switch ($method) {
             // ✅ Clear only those selected items
             $delete_placeholders = implode(',', array_fill(0, count($item_ids), '?'));
             $clear_cart = $db->prepare("
-            DELETE FROM cart_items 
-            WHERE cart_id = ? AND id IN ($delete_placeholders)
+                DELETE FROM cart_items 
+                WHERE cart_id = ? AND id IN ($delete_placeholders)
         ");
             $clear_cart->execute($params);
 
