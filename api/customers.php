@@ -35,6 +35,8 @@ switch ($method) {
                         c.address,
                         c.city,
                         c.postal_code,
+                        c.latitude,
+                        c.longitude,
                         c.created_at
                       FROM customers c
                       JOIN users u ON c.id = u.id
