@@ -192,7 +192,9 @@ switch ($method) {
                 "phone_number",
                 "address",
                 "city",
-                "postal_code"
+                "postal_code",
+                "latitude",
+                "longitude"
             ];
 
             foreach ($fields as $field) {
