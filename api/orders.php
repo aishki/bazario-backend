@@ -126,14 +126,14 @@ switch ($method) {
 
             // Create order
             $order_stmt = $db->prepare("
-            INSERT INTO orders (customer_id, total_amount, status) 
-            VALUES (:cid, :total, 'pending') RETURNING id
+            INSERT INTO orders (customer_id, total_amount, status, delivery_fee) 
+            VALUES (:cid, :total, 'pending', :delivery_fee)
+            RETURNING id
         ");
             $order_stmt->bindParam(':cid', $data->customer_id);
             $order_stmt->bindParam(':total', $total);
+            $order_stmt->bindParam(':delivery_fee', $delivery_fee);
             $order_stmt->execute();
-            $order = $order_stmt->fetch(PDO::FETCH_ASSOC);
-            $order_id = $order['id'];
 
             // Insert items
             $insert_item = $db->prepare("
