@@ -85,11 +85,15 @@ switch ($method) {
 
             if (empty($items)) throw new Exception("No valid cart items found");
 
-            // Compute total
+            // Compute subtotal from items
             $total = 0;
             foreach ($items as $it) {
                 $total += $it['price'] * $it['quantity'];
             }
+
+            // Add delivery fee if provided
+            $delivery_fee = isset($data->delivery_fee) ? floatval($data->delivery_fee) : 0;
+            $total += $delivery_fee;
 
             // Create order
             $order_stmt = $db->prepare("
