@@ -133,13 +133,16 @@ switch ($method) {
             $total += $delivery_fee;
 
             // Create order
+            $status = isset($data->status) ? $data->status : 'pending';
+
             $order_stmt = $db->prepare("
                 INSERT INTO orders (customer_id, total_amount, status, delivery_fee) 
-                VALUES (:cid, :total, 'pending', :delivery_fee)
+                VALUES (:cid, :total, :status, :delivery_fee)
                 RETURNING id
             ");
             $order_stmt->bindParam(':cid', $data->customer_id);
             $order_stmt->bindParam(':total', $total);
+            $order_stmt->bindParam(':status', $status);
             $order_stmt->bindParam(':delivery_fee', $delivery_fee);
             $order_stmt->execute();
 
