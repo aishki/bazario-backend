@@ -4,7 +4,10 @@ header("Content-Type: application/json");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-include_once '../config/db_connect.php';
+require_once '../config/db_connect.php';
+
+$db = new Database();
+$pdo = $db->getConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $data = json_decode(file_get_contents("php://input"), true);
