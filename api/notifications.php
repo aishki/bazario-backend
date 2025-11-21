@@ -28,12 +28,11 @@ switch ($method) {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode(["success" => true, "unread_count" => $result['unread_count']]);
         } else {
-            $query = "SELECT n.*, o.status
-                      FROM notifications n
-                      LEFT JOIN orders o ON n.order_id = o.id
-                      WHERE n.user_id = :uid
-                      ORDER BY n.created_at DESC
-                      LIMIT 50";
+            $query = "SELECT *
+                FROM notifications
+                WHERE user_id = :uid
+                ORDER BY created_at DESC
+                LIMIT 50";
             $stmt = $db->prepare($query);
             $stmt->bindParam(':uid', $user_id);
             $stmt->execute();
