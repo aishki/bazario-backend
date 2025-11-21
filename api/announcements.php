@@ -73,11 +73,21 @@ switch ($method) {
             }
 
             echo json_encode(["success" => true, "message" => "Announcement liked"]);
+        } elseif ($action === 'unlike') {
+            // Remove like
+            $deleteQuery = "DELETE FROM announcement_likes WHERE announcement_id = :aid AND user_id = :uid";
+            $deleteStmt = $db->prepare($deleteQuery);
+            $deleteStmt->bindParam(':aid', $announcement_id);
+            $deleteStmt->bindParam(':uid', $user_id);
+            $deleteStmt->execute();
+
+            echo json_encode(["success" => true, "message" => "Announcement unliked"]);
         } else {
             echo json_encode(["success" => false, "message" => "Invalid action"]);
         }
 
         break;
+
 
     default:
         echo json_encode(["success" => false, "message" => "Method not allowed"]);
