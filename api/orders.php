@@ -133,7 +133,7 @@ switch ($method) {
             $total += $delivery_fee;
 
             // Create order
-            $status = isset($data->status) ? $data->status : 'pending';
+            $status = isset($data->status) ? $data->status : 'paid'; // Default status to 'paid'
 
             $order_stmt = $db->prepare("
                 INSERT INTO orders (customer_id, total_amount, status, delivery_fee) 
@@ -146,9 +146,22 @@ switch ($method) {
             $order_stmt->bindParam(':delivery_fee', $delivery_fee);
             $order_stmt->execute();
 
-            // ✅ Fetch the new order ID
+            // Fetch the new order ID
             $order_row = $order_stmt->fetch(PDO::FETCH_ASSOC);
             $order_id = $order_row['id'];
+
+            $short_id = substr($order_id, 0, 8);
+            $initial_message = "Your order (ID: " . $short_id . ") is pending approval, Bazario will review your payment so just sit back and relax!";
+
+            $notif_stmt = $db->prepare("
+                INSERT INTO notifications (customer_id, order_id, message, status, is_read, created_at)
+                VALUES (:cid, :oid, :message, :status, false, NOW())
+            ");
+            $notif_stmt->bindParam(':cid', $data->customer_id);
+            $notif_stmt->bindParam(':oid', $order_id);
+            $notif_stmt->bindParam(':message', $initial_message);
+            $notif_stmt->bindParam(':status', $status);
+            $notif_stmt->execute();
 
             // Insert items
             $insert_item = $db->prepare("
@@ -163,7 +176,7 @@ switch ($method) {
                 $insert_item->execute();
             }
 
-            // ✅ Clear only those selected items
+            // Clear only those selected items
             $delete_placeholders = implode(',', array_fill(0, count($item_ids), '?'));
             $clear_cart = $db->prepare("
                 DELETE FROM cart_items 
@@ -179,7 +192,6 @@ switch ($method) {
         }
         break;
 
-
     // -------------------------------------------------------------
     // PUT - Update order status
     // -------------------------------------------------------------
@@ -194,44 +206,6 @@ switch ($method) {
         $update->bindParam(':s', $data->status);
         $update->bindParam(':id', $data->order_id);
         $update->execute();
-
-        $order_query = $db->prepare("SELECT customer_id FROM orders WHERE id = :id");
-        $order_query->bindParam(':id', $data->order_id);
-        $order_query->execute();
-        $order = $order_query->fetch(PDO::FETCH_ASSOC);
-
-        if ($order) {
-            $customer_id = $order['customer_id'];
-            $status = $data->status;
-
-            $title = "Order Update";
-            $message = "";
-
-            if ($status === 'paid') {
-                $message = "Your Order #" . substr($data->order_id, 0, 8) . " is Under Review";
-            } else if ($status === 'payment verified') {
-                $message = "Your Order #" . substr($data->order_id, 0, 8) . " is being prepared";
-            } else if ($status === 'on the way') {
-                $message = "Your Order #" . substr($data->order_id, 0, 8) . " is on the way";
-            } else if ($status === 'completed') {
-                $message = "Your Order #" . substr($data->order_id, 0, 8) . " has been delivered. Thanks for shopping!";
-            } else if ($status === 'cancelled') {
-                $message = "Your Order #" . substr($data->order_id, 0, 8) . " has been cancelled";
-            } else {
-                $message = "Your Order #" . substr($data->order_id, 0, 8) . " status is " . ucfirst($status);
-            }
-
-            $notif_stmt = $db->prepare("
-                INSERT INTO notifications (customer_id, order_id, title, message, status, is_read, created_at)
-                VALUES (:cid, :oid, :title, :message, :status, false, NOW())
-            ");
-            $notif_stmt->bindParam(':cid', $customer_id);
-            $notif_stmt->bindParam(':oid', $data->order_id);
-            $notif_stmt->bindParam(':title', $title);
-            $notif_stmt->bindParam(':message', $message);
-            $notif_stmt->bindParam(':status', $status);
-            $notif_stmt->execute();
-        }
 
         echo json_encode(["success" => true, "message" => "Order status updated"]);
         break;
