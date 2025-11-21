@@ -195,6 +195,44 @@ switch ($method) {
         $update->bindParam(':id', $data->order_id);
         $update->execute();
 
+        $order_query = $db->prepare("SELECT customer_id FROM orders WHERE id = :id");
+        $order_query->bindParam(':id', $data->order_id);
+        $order_query->execute();
+        $order = $order_query->fetch(PDO::FETCH_ASSOC);
+
+        if ($order) {
+            $customer_id = $order['customer_id'];
+            $status = $data->status;
+
+            $title = "Order Update";
+            $message = "";
+
+            if ($status === 'paid') {
+                $message = "Your Order #" . substr($data->order_id, 0, 8) . " is Under Review";
+            } else if ($status === 'payment verified') {
+                $message = "Your Order #" . substr($data->order_id, 0, 8) . " is being prepared";
+            } else if ($status === 'on the way') {
+                $message = "Your Order #" . substr($data->order_id, 0, 8) . " is on the way";
+            } else if ($status === 'completed') {
+                $message = "Your Order #" . substr($data->order_id, 0, 8) . " has been delivered. Thanks for shopping!";
+            } else if ($status === 'cancelled') {
+                $message = "Your Order #" . substr($data->order_id, 0, 8) . " has been cancelled";
+            } else {
+                $message = "Your Order #" . substr($data->order_id, 0, 8) . " status is " . ucfirst($status);
+            }
+
+            $notif_stmt = $db->prepare("
+                INSERT INTO notifications (customer_id, order_id, title, message, status, is_read, created_at)
+                VALUES (:cid, :oid, :title, :message, :status, false, NOW())
+            ");
+            $notif_stmt->bindParam(':cid', $customer_id);
+            $notif_stmt->bindParam(':oid', $data->order_id);
+            $notif_stmt->bindParam(':title', $title);
+            $notif_stmt->bindParam(':message', $message);
+            $notif_stmt->bindParam(':status', $status);
+            $notif_stmt->execute();
+        }
+
         echo json_encode(["success" => true, "message" => "Order status updated"]);
         break;
 
