@@ -14,20 +14,30 @@ switch ($method) {
     // GET - Fetch announcements
     case 'GET':
         $target = isset($_GET['target']) ? $_GET['target'] : 'all';
+        $vendorId = isset($_GET['vendor_id']) ? $_GET['vendor_id'] : null;
 
-        $query = "SELECT a.*, COALESCE(l.likes_count, 0) as likes
-                  FROM announcements a
-                  LEFT JOIN (
-                    SELECT announcement_id, COUNT(*) as likes_count
-                    FROM announcement_likes
-                    GROUP BY announcement_id
-                  ) l ON a.id = l.announcement_id
-                  WHERE a.target_audience = :target OR a.target_audience = 'all'
-                  ORDER BY a.created_at DESC
-                  LIMIT 50";
+        // Fetch announcements with admin username and likes count
+        $query = "
+            SELECT a.*, u.username AS admin_name,
+                   COALESCE(l.likes_count, 0) AS likes,
+                   CASE WHEN al.user_id IS NOT NULL THEN true ELSE false END AS is_liked
+            FROM announcements a
+            LEFT JOIN users u ON a.posted_by = u.id
+            LEFT JOIN (
+                SELECT announcement_id, COUNT(*) AS likes_count
+                FROM announcement_likes
+                GROUP BY announcement_id
+            ) l ON a.id = l.announcement_id
+            LEFT JOIN announcement_likes al 
+                ON a.id = al.announcement_id AND al.user_id = :vendorId
+            WHERE a.target_audience = :target OR a.target_audience = 'all'
+            ORDER BY a.created_at DESC
+            LIMIT 50
+        ";
 
         $stmt = $db->prepare($query);
         $stmt->bindParam(':target', $target);
+        $stmt->bindParam(':vendorId', $vendorId);
         $stmt->execute();
         $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
