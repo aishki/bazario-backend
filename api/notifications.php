@@ -12,25 +12,30 @@ $method = $_SERVER['REQUEST_METHOD'];
 switch ($method) {
     // GET - Fetch notifications
     case 'GET':
-        if (!isset($_GET['customer_id'])) {
-            echo json_encode(["success" => false, "message" => "customer_id required"]);
+        if (!isset($_GET['user_id'])) {
+            echo json_encode(["success" => false, "message" => "user_id required"]);
             exit;
         }
 
-        $customer_id = $_GET['customer_id'];
+        $user_id = $_GET['user_id'];
         $unread_only = isset($_GET['unread']) && $_GET['unread'] === 'true';
 
         if ($unread_only) {
-            $query = "SELECT COUNT(*) as unread_count FROM notifications WHERE customer_id = :cid AND is_read = false";
+            $query = "SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = :uid AND read = false";
             $stmt = $db->prepare($query);
-            $stmt->bindParam(':cid', $customer_id);
+            $stmt->bindParam(':uid', $user_id);
             $stmt->execute();
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode(["success" => true, "unread_count" => $result['unread_count']]);
         } else {
-            $query = "SELECT * FROM notifications WHERE customer_id = :cid ORDER BY created_at DESC LIMIT 50";
+            $query = "SELECT n.*, o.status
+                      FROM notifications n
+                      LEFT JOIN orders o ON n.order_id = o.id
+                      WHERE n.user_id = :uid
+                      ORDER BY n.created_at DESC
+                      LIMIT 50";
             $stmt = $db->prepare($query);
-            $stmt->bindParam(':cid', $customer_id);
+            $stmt->bindParam(':uid', $user_id);
             $stmt->execute();
             $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(["success" => true, "notifications" => $notifications]);
@@ -45,7 +50,7 @@ switch ($method) {
             exit;
         }
 
-        $query = "UPDATE notifications SET is_read = true WHERE id = :nid";
+        $query = "UPDATE notifications SET read = true WHERE id = :nid";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':nid', $data->notification_id);
         $stmt->execute();

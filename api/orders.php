@@ -154,13 +154,12 @@ switch ($method) {
             $initial_message = "Your order (ID: " . $short_id . ") is pending approval, Bazario will review your payment so just sit back and relax!";
 
             $notif_stmt = $db->prepare("
-                INSERT INTO notifications (customer_id, order_id, message, status, is_read, created_at)
-                VALUES (:cid, :oid, :message, :status, false, NOW())
+                INSERT INTO notifications (user_id, order_id, message, type, read, created_at)
+                VALUES (:uid, :oid, :message, 'order_update', false, NOW())
             ");
-            $notif_stmt->bindParam(':cid', $data->customer_id);
+            $notif_stmt->bindParam(':uid', $data->customer_id);
             $notif_stmt->bindParam(':oid', $order_id);
             $notif_stmt->bindParam(':message', $initial_message);
-            $notif_stmt->bindParam(':status', $status);
             $notif_stmt->execute();
 
             // Insert items
