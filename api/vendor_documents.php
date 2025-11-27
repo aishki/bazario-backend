@@ -67,8 +67,13 @@ try {
 
         // Build update fields dynamically
         $fields = [];
-        if (isset($data['file_url'])) $fields[] = "file_url = :file_url";
-        if (isset($data['status'])) {
+        if (isset($data['file_url'])) {
+            $fields[] = "file_url = :file_url";
+            $fields[] = "status = 'pending'"; // Reset status when file is replaced
+            $fields[] = "reviewed_at = NULL"; // Clear review timestamp
+            $fields[] = "reviewed_by = NULL"; // Clear reviewer
+        }
+        if (isset($data['status']) && !isset($data['file_url'])) {
             $fields[] = "status = :status";
             $fields[] = "reviewed_at = NOW()";
             if (isset($data['reviewed_by'])) $fields[] = "reviewed_by = :reviewed_by";
@@ -83,7 +88,7 @@ try {
         $stmt = $db->prepare($query);
         $stmt->bindParam(":id", $data['id']);
         if (isset($data['file_url'])) $stmt->bindParam(":file_url", $data['file_url']);
-        if (isset($data['status'])) $stmt->bindParam(":status", $data['status']);
+        if (isset($data['status']) && !isset($data['file_url'])) $stmt->bindParam(":status", $data['status']);
         if (isset($data['reviewed_by'])) $stmt->bindParam(":reviewed_by", $data['reviewed_by']);
         $stmt->execute();
 
