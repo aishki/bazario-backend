@@ -1,8 +1,9 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET, POST, DELETE");
+header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
+
 ini_set('upload_max_filesize', '20M');
 ini_set('post_max_size', '20M');
 ini_set('memory_limit', '256M');
@@ -10,25 +11,35 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-
 include_once '../config/db_connect.php';
 
 $database = new Database();
 $db = $database->getConnection();
 
+// Handle preflight OPTIONS requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 $action = $_REQUEST['action'] ?? null;
 
 try {
     if ($action === 'upload') {
-        // Parse input first
-        $input = json_decode(file_get_contents('php://input'), true);
-        file_put_contents('upload_debug.txt', print_r($input, true), FILE_APPEND);
+        // Get raw input and decode JSON
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+
+        // Log for debugging
+        error_log("Upload input: " . print_r($input, true));
+        error_log("Binary length: " . strlen($binaryData));
 
         if ($input === null) {
             echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
             exit;
         }
 
+        // Validate required fields
         if (!isset($input['file_data'], $input['storage_type'], $input['record_id'])) {
             echo json_encode(['success' => false, 'message' => 'Missing required fields']);
             exit;
@@ -39,10 +50,14 @@ try {
         $recordId = $input['record_id'];
         $fileName = $input['file_name'] ?? 'file';
 
-        // Decode base64
-        $binaryData = base64_decode($fileData);
+        // Decode base64 safely
+        $binaryData = base64_decode($fileData, true);
+        if ($binaryData === false) {
+            echo json_encode(['success' => false, 'message' => 'Invalid base64 file data']);
+            exit;
+        }
 
-        // Route to appropriate table based on storage type
+        // Determine table & column based on storage type
         switch ($storageType) {
             case 'vendor_logo':
                 $query = "UPDATE vendors SET logo_data = :file_data WHERE id = :record_id";
@@ -70,36 +85,31 @@ try {
         $stmt->execute();
 
         echo json_encode(['success' => true, 'message' => 'File uploaded successfully']);
+        exit;
     } elseif ($action === 'download') {
         $recordId = $_GET['record_id'] ?? null;
         $storageType = $_GET['storage_type'] ?? null;
 
         if (!$recordId || !$storageType) {
-            echo json_encode(['success' => false, 'message' => 'Missing parameters']);
+            echo json_encode(['success' => false, 'message' => 'Missing record_id or storage_type']);
             exit;
         }
 
-        // Route to appropriate table
         switch ($storageType) {
             case 'vendor_logo':
                 $query = "SELECT logo_data FROM vendors WHERE id = :record_id";
-                $column = 'logo_data';
                 break;
             case 'vendor_doc':
                 $query = "SELECT file_data FROM vendor_documents WHERE id = :record_id";
-                $column = 'file_data';
                 break;
             case 'payment_receipt':
                 $query = "SELECT receipt_data FROM order_payments WHERE id = :record_id";
-                $column = 'receipt_data';
                 break;
             case 'product_image':
                 $query = "SELECT image_data FROM vendor_products WHERE id = :record_id";
-                $column = 'image_data';
                 break;
             case 'event_receipt':
                 $query = "SELECT receipt_data FROM event_vendors WHERE id = :record_id";
-                $column = 'receipt_data';
                 break;
             default:
                 echo json_encode(['success' => false, 'message' => 'Invalid storage type']);
@@ -109,31 +119,25 @@ try {
         $stmt = $db->prepare($query);
         $stmt->bindParam(':record_id', $recordId);
         $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($stmt->rowCount() > 0) {
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $fileData = $row[$column];
-
-            if ($fileData) {
-                $base64Data = base64_encode($fileData);
-                echo json_encode(['success' => true, 'file_data' => $base64Data]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'No file found']);
-            }
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Record not found']);
-        }
-    } elseif ($action === 'delete') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $recordId = $input['record_id'] ?? null;
-        $storageType = $input['storage_type'] ?? null;
-
-        if (!$recordId || !$storageType) {
-            echo json_encode(['success' => false, 'message' => 'Missing parameters']);
+        if (!$row || empty($row[array_keys($row)[0]])) {
+            echo json_encode(['success' => false, 'message' => 'File not found']);
             exit;
         }
 
-        // Route to appropriate table
+        $fileData = base64_encode($row[array_keys($row)[0]]);
+        echo json_encode(['success' => true, 'file_data' => $fileData]);
+        exit;
+    } elseif ($action === 'delete') {
+        $recordId = $_POST['record_id'] ?? null;
+        $storageType = $_POST['storage_type'] ?? null;
+
+        if (!$recordId || !$storageType) {
+            echo json_encode(['success' => false, 'message' => 'Missing record_id or storage_type']);
+            exit;
+        }
+
         switch ($storageType) {
             case 'vendor_logo':
                 $query = "UPDATE vendors SET logo_data = NULL WHERE id = :record_id";
@@ -159,8 +163,14 @@ try {
         $stmt->bindParam(':record_id', $recordId);
         $stmt->execute();
 
-        echo json_encode(['success' => true, 'message' => 'File deleted']);
+        echo json_encode(['success' => true, 'message' => 'File deleted successfully']);
+        exit;
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Invalid action']);
+        exit;
     }
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    error_log("Upload error: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+    exit;
 }
