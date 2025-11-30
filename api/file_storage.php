@@ -6,6 +6,9 @@ header("Access-Control-Allow-Headers: Content-Type");
 ini_set('upload_max_filesize', '20M');
 ini_set('post_max_size', '20M');
 ini_set('memory_limit', '256M');
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 
 include_once '../config/db_connect.php';
@@ -17,8 +20,14 @@ $action = $_REQUEST['action'] ?? null;
 
 try {
     if ($action === 'upload') {
-        // Parse input
+        // Parse input first
         $input = json_decode(file_get_contents('php://input'), true);
+        file_put_contents('upload_debug.txt', print_r($input, true), FILE_APPEND);
+
+        if ($input === null) {
+            echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
+            exit;
+        }
 
         if (!isset($input['file_data'], $input['storage_type'], $input['record_id'])) {
             echo json_encode(['success' => false, 'message' => 'Missing required fields']);
