@@ -3,6 +3,10 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET, POST, DELETE");
 header("Access-Control-Allow-Headers: Content-Type");
+ini_set('upload_max_filesize', '20M');
+ini_set('post_max_size', '20M');
+ini_set('memory_limit', '256M');
+
 
 include_once '../config/db_connect.php';
 
