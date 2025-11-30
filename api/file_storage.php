@@ -22,7 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$action = $_REQUEST['action'] ?? null;
+// Read JSON input
+$rawInput = file_get_contents('php://input');
+$input = json_decode($rawInput, true);
+$action = $input['action'] ?? null;
+error_log("Action received: " . print_r($action, true)); // debug log
 
 try {
     if ($action === 'upload') {
