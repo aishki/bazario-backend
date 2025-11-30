@@ -36,7 +36,6 @@ try {
 
         // Log for debugging
         error_log("Upload input: " . print_r($input, true));
-        error_log("Binary length: " . strlen($binaryData));
 
         if ($input === null) {
             echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
@@ -56,6 +55,8 @@ try {
 
         // Decode base64 safely
         $binaryData = base64_decode($fileData, true);
+        error_log("Binary length: " . strlen($binaryData));
+
         if ($binaryData === false) {
             echo json_encode(['success' => false, 'message' => 'Invalid base64 file data']);
             exit;
@@ -147,7 +148,7 @@ try {
                 $query = "UPDATE vendors SET logo_data = NULL WHERE id = :record_id";
                 break;
             case 'vendor_doc':
-                $query = "UPDATE vendor_documents SET file_data = NULL WHERE id = :record_id";
+                $query = "UPDATE vendor_documents SET file_data = :file_data WHERE id = :record_id";
                 break;
             case 'payment_receipt':
                 $query = "UPDATE order_payments SET receipt_data = NULL WHERE id = :record_id";
