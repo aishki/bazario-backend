@@ -79,59 +79,103 @@ try {
         // ===================== POST =====================
         case 'POST':
             $data = json_decode(file_get_contents("php://input"), true);
+
             if (!isset($data['vendor_id']) || !isset($data['name'])) {
-                echo json_encode(["success" => false, "message" => "vendor_id and name are required"]);
+                echo json_encode([
+                    "success" => false,
+                    "message" => "vendor_id and name are required"
+                ]);
                 exit;
             }
 
             $vendor_id = $data['vendor_id'];
             $name = $data['name'];
             $description = $data['description'] ?? null;
-            $imageUrl = $data['imageUrl'] ?? null;
             $is_featured = $data['isFeatured'] ?? false;
 
+            // ===== IMAGE HANDLING =====
+            $imageUrl = null;
             $imageData = null;
+
             if (!empty($data['imageData'])) {
                 $imageData = base64_decode($data['imageData']);
                 if ($imageData === false) {
-                    echo json_encode(["success" => false, "message" => "Failed to decode image data"]);
+                    echo json_encode([
+                        "success" => false,
+                        "message" => "Failed to decode image data"
+                    ]);
                     exit;
                 }
+
+                // Generate unique filename
+                $fileName = 'product_' . uniqid() . '.jpg';
+                $uploadDir = __DIR__ . '/../uploads/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+
+                // Save file to uploads/
+                file_put_contents($uploadDir . $fileName, $imageData);
+
+                // Generate accessible URL
+                $imageUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http")
+                    . "://{$_SERVER['HTTP_HOST']}/uploads/$fileName";
             }
 
-            // Check if vendor has 10 products
-            $checkStmt = $db->prepare("SELECT COUNT(*) AS count FROM vendor_products WHERE vendor_id = :vendor_id");
+            // ===== CHECK MAX PRODUCTS =====
+            $checkQuery = "SELECT COUNT(*) as product_count FROM vendor_products WHERE vendor_id = :vendor_id";
+            $checkStmt = $db->prepare($checkQuery);
             $checkStmt->bindParam(':vendor_id', $vendor_id);
             $checkStmt->execute();
             $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            if ($result['count'] >= 10) {
-                echo json_encode(["success" => false, "message" => "You can only add up to 10 products."]);
+
+            if ($result['product_count'] >= 10) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "You can only add up to 10 products."
+                ]);
                 exit;
             }
 
-            // Insert product
-            $query = "
-                INSERT INTO vendor_products
+            // ===== INSERT PRODUCT =====
+            $query = "INSERT INTO vendor_products 
                 (vendor_id, name, description, image_url, image_data, is_featured, created_at)
-                VALUES (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
-                RETURNING id, vendor_id, name, description, image_url, is_featured, created_at
-            ";
+            VALUES 
+                (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
+            RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
+
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
             $stmt->bindParam(':name', $name);
             $stmt->bindParam(':description', $description);
             $stmt->bindParam(':image_url', $imageUrl);
-            $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);
+            $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);  // <-- store bytea
             $stmt->bindParam(':is_featured', $is_featured, PDO::PARAM_BOOL);
 
-            if ($stmt->execute()) {
-                $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
-                echo json_encode(["success" => true, "message" => "Product created successfully", "product" => $newProduct]);
-            } else {
-                $errorInfo = $stmt->errorInfo();
-                echo json_encode(["success" => false, "message" => "Failed to create product: {$errorInfo[2]}"]);
+
+            try {
+                if ($stmt->execute()) {
+                    $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
+                    echo json_encode([
+                        "success" => true,
+                        "message" => "Product created successfully",
+                        "product" => $newProduct
+                    ]);
+                } else {
+                    $errorInfo = $stmt->errorInfo();
+                    echo json_encode([
+                        "success" => false,
+                        "message" => "Failed to create product: {$errorInfo[2]}"
+                    ]);
+                }
+            } catch (Exception $e) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Exception: " . $e->getMessage()
+                ]);
             }
             break;
+
 
         // ===================== PUT =====================
         case 'PUT':
