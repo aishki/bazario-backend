@@ -104,10 +104,10 @@ switch ($method) {
         $checkStmt->execute();
         $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($result['product_count'] >= 5) {
+        if ($result['product_count'] >= 10) {
             echo json_encode([
                 "success" => false,
-                "message" => "You can only feature 5 top products for your shop! Delete an existing product first to replace them."
+                "message" => "You can only add up to 10 products.",
             ]);
             exit;
         }
