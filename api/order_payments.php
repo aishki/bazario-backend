@@ -26,18 +26,21 @@ if ($method === 'POST' && isset($data['action']) && $data['action'] === 'add_pay
     }
 
     try {
-        $query = "INSERT INTO order_payments (order_id, reference_number, receipt_url, status)
-                  VALUES (:order_id, :reference_number, :receipt_url, 'under_review')";
+        $query = "INSERT INTO order_payments (order_id, reference_number, status)
+          VALUES (:order_id, :reference_number, 'under_review')
+          RETURNING id";
 
         $stmt = $pdo->prepare($query);
         $stmt->execute([
             ":order_id" => $order_id,
-            ":reference_number" => $reference_number,
-            ":receipt_url" => $receipt_url
+            ":reference_number" => $reference_number
         ]);
+
+        $newPayment = $stmt->fetch(PDO::FETCH_ASSOC);
 
         echo json_encode([
             "success" => true,
+            "payment_id" => $newPayment["id"],
             "message" => "Payment record created successfully."
         ]);
     } catch (PDOException $e) {
@@ -48,6 +51,32 @@ if ($method === 'POST' && isset($data['action']) && $data['action'] === 'add_pay
     }
     exit;
 }
+
+if ($method === 'POST' && isset($data['action']) && $data['action'] === 'update_receipt_url') {
+    $payment_id = $data['payment_id'] ?? null;
+    $receipt_url = $data['receipt_url'] ?? null;
+
+    if (!$payment_id || !$receipt_url) {
+        echo json_encode(["success" => false, "message" => "Missing required fields."]);
+        exit;
+    }
+
+    try {
+        $stmt = $pdo->prepare(
+            "UPDATE order_payments SET receipt_url = :receipt_url WHERE id = :id"
+        );
+        $stmt->execute([
+            ":receipt_url" => $receipt_url,
+            ":id" => $payment_id,
+        ]);
+
+        echo json_encode(["success" => true, "message" => "Receipt URL updated."]);
+    } catch (PDOException $e) {
+        echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
+    }
+    exit;
+}
+
 
 if ($method === 'GET' && isset($_GET['order_id'])) {
     $order_id = $_GET['order_id'];
