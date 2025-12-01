@@ -35,9 +35,21 @@ switch ($method) {
 
                 $stmt = $db->prepare($query);
                 $stmt->bindParam(':vendor_id', $vendor_id);
-                $stmt->execute();
+                if ($stmt->execute()) {
+                    $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
+                    echo json_encode([
+                        "success" => true,
+                        "message" => "Product created successfully",
+                        "product" => $newProduct
+                    ]);
+                } else {
+                    $errorInfo = $stmt->errorInfo();
+                    echo json_encode([
+                        "success" => false,
+                        "message" => "Failed to create product: {$errorInfo[2]}"
+                    ]);
+                }
 
-                $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 echo json_encode([
                     "success" => true,
@@ -97,58 +109,79 @@ switch ($method) {
             exit;
         }
 
+        $vendor_id = $data['vendor_id'];
+        $name = $data['name'];
+        $description = $data['description'] ?? null;
+        $imageUrl = $data['imageUrl'] ?? null;
+        $is_featured = $data['isFeatured'] ?? false;
+
+        // Decode base64 image if present
+        $imageData = null;
+        if (!empty($data['imageData'])) {
+            $imageData = base64_decode($data['imageData']);
+            if ($imageData === false) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Failed to decode image data"
+                ]);
+                exit;
+            }
+        }
+
         // Check if vendor already has 10 products
         $checkQuery = "SELECT COUNT(*) as product_count FROM vendor_products WHERE vendor_id = :vendor_id";
         $checkStmt = $db->prepare($checkQuery);
-        $checkStmt->bindParam(':vendor_id', $data['vendor_id']);
+        $checkStmt->bindParam(':vendor_id', $vendor_id);
         $checkStmt->execute();
         $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
         if ($result['product_count'] >= 10) {
             echo json_encode([
                 "success" => false,
-                "message" => "You can only add up to 10 products.",
+                "message" => "You can only add up to 10 products."
             ]);
             exit;
         }
 
-        // Prepare product data
-        $vendor_id = $data['vendor_id'];
-        $name = $data['name'];
-        $description = $data['description'] ?? null;
-        $image_url = $data['image_url'] ?? null;
-        $image_data = isset($data['image_data']) ? base64_decode($data['image_data']) : null;
-        $is_featured = $data['is_featured'] ?? false;
-
         // Insert product
         $query = "INSERT INTO vendor_products 
-                (vendor_id, name, description, image_url, image_data, is_featured, created_at)
-              VALUES 
-                (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
-              RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
+            (vendor_id, name, description, image_url, image_data, is_featured, created_at)
+          VALUES 
+            (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
+          RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
 
         $stmt = $db->prepare($query);
         $stmt->bindParam(':vendor_id', $vendor_id);
         $stmt->bindParam(':name', $name);
         $stmt->bindParam(':description', $description);
-        $stmt->bindParam(':image_url', $image_url);
-        $stmt->bindParam(':image_data', $image_data, PDO::PARAM_LOB); // <--- store bytes directly
+        $stmt->bindParam(':image_url', $imageUrl);
+        $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);
         $stmt->bindParam(':is_featured', $is_featured, PDO::PARAM_BOOL);
 
-        if ($stmt->execute()) {
-            $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
-            echo json_encode([
-                "success" => true,
-                "message" => "Product created successfully",
-                "product" => $newProduct
-            ]);
-        } else {
+        try {
+            if ($stmt->execute()) {
+                $newProduct = $stmt->fetch(PDO::FETCH_ASSOC); // fetch the returned row
+                echo json_encode([
+                    "success" => true,
+                    "message" => "Product created successfully",
+                    "product" => $newProduct
+                ]);
+            } else {
+                $errorInfo = $stmt->errorInfo();
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Failed to create product: {$errorInfo[2]}"
+                ]);
+            }
+        } catch (Exception $e) {
             echo json_encode([
                 "success" => false,
-                "message" => "Failed to create product"
+                "message" => "Exception: " . $e->getMessage()
             ]);
         }
         break;
+
+
 
     case 'PUT':
         $data = json_decode(file_get_contents("php://input"), true);
@@ -194,18 +227,27 @@ switch ($method) {
         $stmt = $db->prepare($query);
         $stmt->bindParam(':id', $data['id']);
 
-        if ($stmt->execute()) {
-            echo json_encode([
-                "success" => true,
-                "message" => "Product deleted successfully"
-            ]);
-        } else {
+        try {
+            if ($stmt->execute()) {
+                echo json_encode([
+                    "success" => true,
+                    "message" => "Product deleted successfully"
+                ]);
+            } else {
+                $errorInfo = $stmt->errorInfo();
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Failed to delete product: {$errorInfo[2]}"
+                ]);
+            }
+        } catch (Exception $e) {
             echo json_encode([
                 "success" => false,
-                "message" => "Failed to delete product"
+                "message" => "Exception: " . $e->getMessage()
             ]);
         }
         break;
+
 
     default:
         echo json_encode(["success" => false, "message" => "Method not allowed"]);
