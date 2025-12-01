@@ -17,10 +17,40 @@ switch ($method) {
         if (isset($_GET['vendor_id'])) {
             $vendor_id = $_GET['vendor_id'];
 
+            // Check if we want top products
+            if (isset($_GET['top_products']) && $_GET['top_products'] == 'true') {
+
+                // Get products sold by this vendor, summing quantity
+                $query = "
+                SELECT p.id, p.vendor_id, p.name, p.description, p.image_url, p.is_featured,
+                       COALESCE(SUM(s.quantity),0) as total_sold
+                FROM products p
+                LEFT JOIN sale_items s ON s.product_id = p.id
+                LEFT JOIN business_partners b ON p.business_partner_id = b.id
+                WHERE p.vendor_id = :vendor_id OR b.vendor_id = :vendor_id
+                GROUP BY p.id
+                ORDER BY total_sold DESC
+                LIMIT 3
+            ";
+
+                $stmt = $db->prepare($query);
+                $stmt->bindParam(':vendor_id', $vendor_id);
+                $stmt->execute();
+
+                $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                echo json_encode([
+                    "success" => true,
+                    "products" => $products
+                ]);
+                exit;
+            }
+
+            // Regular products for vendor (PRODUCT LIST)
             $query = "SELECT id, vendor_id, name, description, image_url, is_featured, created_at
-                      FROM vendor_products
-                      WHERE vendor_id = :vendor_id
-                      ORDER BY created_at DESC";
+                  FROM vendor_products
+                  WHERE vendor_id = :vendor_id
+                  ORDER BY created_at DESC";
 
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
@@ -39,6 +69,7 @@ switch ($method) {
             ]);
         }
         break;
+
 
     case 'POST':
         $data = json_decode(file_get_contents("php://input"), true);

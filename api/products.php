@@ -20,6 +20,7 @@ try {
         p.description,
         p.price,
         p.image_url,
+        p.image_data,
         p.stock,
         p.created_at,
         p.category,
