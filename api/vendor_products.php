@@ -97,7 +97,7 @@ switch ($method) {
             exit;
         }
 
-        // Check if vendor already has 5 products
+        // Check if vendor already has 10 products
         $checkQuery = "SELECT COUNT(*) as product_count FROM vendor_products WHERE vendor_id = :vendor_id";
         $checkStmt = $db->prepare($checkQuery);
         $checkStmt->bindParam(':vendor_id', $data['vendor_id']);
@@ -112,19 +112,28 @@ switch ($method) {
             exit;
         }
 
-        $query = "INSERT INTO vendor_products (vendor_id, name, description, image_url, is_featured)
-                  VALUES (:vendor_id, :name, :description, :image_url, :is_featured)
-                  RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
+        // Prepare product data
+        $vendor_id = $data['vendor_id'];
+        $name = $data['name'];
+        $description = $data['description'] ?? null;
+        $image_url = $data['image_url'] ?? null;
+        $image_data = isset($data['image_data']) ? base64_decode($data['image_data']) : null;
+        $is_featured = $data['is_featured'] ?? false;
+
+        // Insert product
+        $query = "INSERT INTO vendor_products 
+                (vendor_id, name, description, image_url, image_data, is_featured, created_at)
+              VALUES 
+                (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
+              RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
 
         $stmt = $db->prepare($query);
-        $stmt->bindParam(':vendor_id', $data['vendor_id']);
-        $stmt->bindParam(':name', $data['name']);
-        $description = $data['description'] ?? null;
+        $stmt->bindParam(':vendor_id', $vendor_id);
+        $stmt->bindParam(':name', $name);
         $stmt->bindParam(':description', $description);
-        $image_url = $data['image_url'] ?? null;
         $stmt->bindParam(':image_url', $image_url);
-        $is_featured = $data['is_featured'] ?? false;
-        $stmt->bindParam(':is_featured', $is_featured);
+        $stmt->bindParam(':image_data', $image_data, PDO::PARAM_LOB); // <--- store bytes directly
+        $stmt->bindParam(':is_featured', $is_featured, PDO::PARAM_BOOL);
 
         if ($stmt->execute()) {
             $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
