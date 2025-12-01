@@ -22,16 +22,16 @@ switch ($method) {
 
                 // Get products sold by this vendor, summing quantity
                 $query = "
-                SELECT p.id, p.vendor_id, p.name, p.description, p.image_url, p.is_featured,
-                       COALESCE(SUM(s.quantity),0) as total_sold
-                FROM products p
-                LEFT JOIN sale_items s ON s.product_id = p.id
-                LEFT JOIN business_partners b ON p.business_partner_id = b.id
-                WHERE p.vendor_id = :vendor_id OR b.vendor_id = :vendor_id
-                GROUP BY p.id
-                ORDER BY total_sold DESC
-                LIMIT 3
-            ";
+                    SELECT p.id, p.vendor_id, p.name, p.description, p.image_url, p.is_featured,
+                        COALESCE(SUM(s.quantity),0) as total_sold
+                    FROM products p
+                    LEFT JOIN sale_items s ON s.product_id = p.id
+                    LEFT JOIN business_partners b ON p.business_partner_id = b.id
+                    WHERE p.vendor_id = :vendor_id OR b.vendor_id = :vendor_id
+                    GROUP BY p.id
+                    ORDER BY total_sold DESC
+                    LIMIT 3
+                ";
 
                 $stmt = $db->prepare($query);
                 $stmt->bindParam(':vendor_id', $vendor_id);
@@ -47,10 +47,25 @@ switch ($method) {
             }
 
             // Regular products for vendor (PRODUCT LIST)
-            $query = "SELECT id, vendor_id, name, description, image_url, is_featured, created_at
-                  FROM vendor_products
-                  WHERE vendor_id = :vendor_id
-                  ORDER BY created_at DESC";
+            $query = "
+                SELECT 
+                    vp.id,
+                    vp.vendor_id,
+                    vp.name,
+                    vp.description,
+                    vp.image_url,
+                    vp.is_featured,
+                    vp.created_at,
+                    p.price,
+                    p.stock
+                FROM vendor_products vp
+                LEFT JOIN products p 
+                    ON vp.name = p.name 
+                    AND (vp.description = p.description OR (vp.description IS NULL AND p.description IS NULL))
+                WHERE vp.vendor_id = :vendor_id
+                ORDER BY vp.created_at DESC
+            ";
+
 
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
