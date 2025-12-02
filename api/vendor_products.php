@@ -98,8 +98,12 @@ try {
                     echo json_encode(["success" => false, "message" => "Invalid image data"]);
                     exit;
                 }
-                $imageUrl = 'product_' . uniqid() . '.jpg';
+
+                // Generate unique filename
+                $fileName = 'product_' . uniqid() . '.jpg';
+                $imageUrl = "https://bazario-backend-aszl.onrender.com/api/get_product_image.php?file=" . $fileName;
             }
+
 
             // ===== CHECK MAX PRODUCTS =====
             $checkStmt = $db->prepare("SELECT COUNT(*) FROM vendor_products WHERE vendor_id = :vendor_id");
@@ -127,6 +131,7 @@ try {
             $stmt->bindParam(':is_featured', $is_featured, PDO::PARAM_BOOL);
 
             $stmt->execute();
+
             echo json_encode(["success" => true, "product" => $stmt->fetch(PDO::FETCH_ASSOC)]);
             break;
 
