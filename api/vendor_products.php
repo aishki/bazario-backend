@@ -93,28 +93,20 @@ try {
             $imageData = null;
 
             if (!empty($data['imageData'])) {
-                $imageData = $data['imageData'];
+                $base64String = $data['imageData'];
 
-                if (preg_match('/^data:image\/(\w+);base64,/', $imageData, $type)) {
-                    $imageData = substr($imageData, strpos($imageData, ',') + 1);
-                    $imageData = base64_decode($imageData);
-                    $extension = strtolower($type[1]); // jpg, png, gif, etc.
-                } else {
-                    $imageData = base64_decode($imageData);
-                    $extension = 'jpg'; // fallback
-                }
+                // The Dart side sends raw base64, so decode it directly
+                $imageData = base64_decode($base64String, true);
 
                 if ($imageData === false) {
-                    echo json_encode(["success" => false, "message" => "Invalid image data"]);
+                    echo json_encode(["success" => false, "message" => "Invalid image data format"]);
                     exit;
                 }
 
-                // Generate unique filename with correct extension
-                $fileName = 'product_' . uniqid() . '.' . $extension;
-                $imageUrl = "https://bazario-backend-aszl.onrender.com/api/get_product_image.php?file=" . $fileName;
+                // Generate unique filename - store in URL for reference
+                $fileName = 'product_' . uniqid() . '.jpg';
+                $imageUrl = "https://bazario-backend-aszl.onrender.com/api/get_product_image.php?product_id=";
             }
-
-
 
             // ===== CHECK MAX PRODUCTS =====
             $checkStmt = $db->prepare("SELECT COUNT(*) FROM vendor_products WHERE vendor_id = :vendor_id");
@@ -137,13 +129,29 @@ try {
             $stmt->bindParam(':vendor_id', $vendor_id);
             $stmt->bindParam(':name', $name);
             $stmt->bindParam(':description', $description);
-            $stmt->bindParam(':image_url', $imageUrl);
-            $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);
+
+            if ($imageUrl) {
+                $stmt->bindParam(':image_url', $imageUrl, PDO::PARAM_STR);
+                $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);
+            } else {
+                $stmt->bindParam(':image_url', $imageUrl);
+                $stmt->bindParam(':image_data', $imageData);
+            }
+
             $stmt->bindParam(':is_featured', $is_featured, PDO::PARAM_BOOL);
 
             $stmt->execute();
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            echo json_encode(["success" => true, "product" => $stmt->fetch(PDO::FETCH_ASSOC)]);
+            if ($product && $imageUrl) {
+                $product['image_url'] = $imageUrl . $product['id'];
+                $updateStmt = $db->prepare("UPDATE vendor_products SET image_url = :image_url WHERE id = :id");
+                $updateStmt->bindParam(':image_url', $product['image_url']);
+                $updateStmt->bindParam(':id', $product['id']);
+                $updateStmt->execute();
+            }
+
+            echo json_encode(["success" => true, "product" => $product]);
             break;
 
         // ===================== PUT =====================
