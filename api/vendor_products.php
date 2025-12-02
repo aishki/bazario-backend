@@ -93,16 +93,27 @@ try {
             $imageData = null;
 
             if (!empty($data['imageData'])) {
-                $imageData = base64_decode($data['imageData']);
+                $imageData = $data['imageData'];
+
+                if (preg_match('/^data:image\/(\w+);base64,/', $imageData, $type)) {
+                    $imageData = substr($imageData, strpos($imageData, ',') + 1);
+                    $imageData = base64_decode($imageData);
+                    $extension = strtolower($type[1]); // jpg, png, gif, etc.
+                } else {
+                    $imageData = base64_decode($imageData);
+                    $extension = 'jpg'; // fallback
+                }
+
                 if ($imageData === false) {
                     echo json_encode(["success" => false, "message" => "Invalid image data"]);
                     exit;
                 }
 
-                // Generate unique filename
-                $fileName = 'product_' . uniqid() . '.jpg';
+                // Generate unique filename with correct extension
+                $fileName = 'product_' . uniqid() . '.' . $extension;
                 $imageUrl = "https://bazario-backend-aszl.onrender.com/api/get_product_image.php?file=" . $fileName;
             }
+
 
 
             // ===== CHECK MAX PRODUCTS =====
