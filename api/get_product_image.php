@@ -13,8 +13,9 @@ if (!isset($_GET['file'])) {
 
 $fileName = $_GET['file'];
 
-$stmt = $db->prepare("SELECT image_data FROM vendor_products WHERE image_url = :file LIMIT 1");
-$stmt->bindParam(':file', $fileName);
+$stmt = $db->prepare("SELECT image_data FROM vendor_products WHERE image_url LIKE :file LIMIT 1");
+$search = "%$fileName%";
+$stmt->bindParam(':file', $search);
 $stmt->execute();
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
