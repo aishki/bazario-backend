@@ -117,9 +117,7 @@ try {
                 // Save file to uploads/
                 file_put_contents($uploadDir . $fileName, $imageData);
 
-                // Generate accessible URL
-                $imageUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http")
-                    . "://{$_SERVER['HTTP_HOST']}/uploads/$fileName";
+                $imageUrl = $fileName; // Store only filename
             }
 
             // ===== CHECK MAX PRODUCTS =====
