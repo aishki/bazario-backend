@@ -1,4 +1,9 @@
 <?php
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', '/var/www/html/api/error.log');
+
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
@@ -14,13 +19,13 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 try {
     switch ($method) {
+
         // ===================== GET =====================
         case 'GET':
             if (!isset($_GET['vendor_id'])) {
                 echo json_encode(["success" => false, "message" => "vendor_id is required"]);
                 exit;
             }
-
             $vendor_id = $_GET['vendor_id'];
 
             // ----- TOP PRODUCTS -----
@@ -38,14 +43,8 @@ try {
                 ";
                 $stmt = $db->prepare($query);
                 $stmt->bindParam(':vendor_id', $vendor_id);
-
-                if ($stmt->execute()) {
-                    $topProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    echo json_encode(["success" => true, "products" => $topProducts]);
-                } else {
-                    $errorInfo = $stmt->errorInfo();
-                    echo json_encode(["success" => false, "message" => "Failed to fetch top products: {$errorInfo[2]}"]);
-                }
+                $stmt->execute();
+                echo json_encode(["success" => true, "products" => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
                 exit;
             }
 
@@ -64,16 +63,15 @@ try {
                 FROM vendor_products vp
                 LEFT JOIN products p 
                     ON vp.name = p.name 
-                    AND (vp.description = p.description OR (vp.description IS NULL AND p.description IS NULL))
+                    AND (vp.description = p.description OR 
+                        (vp.description IS NULL AND p.description IS NULL))
                 WHERE vp.vendor_id = :vendor_id
                 ORDER BY vp.created_at DESC
             ";
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
             $stmt->execute();
-
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode(["success" => true, "products" => $products]);
+            echo json_encode(["success" => true, "products" => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
             break;
 
         // ===================== POST =====================
@@ -81,10 +79,7 @@ try {
             $data = json_decode(file_get_contents("php://input"), true);
 
             if (!isset($data['vendor_id']) || !isset($data['name'])) {
-                echo json_encode([
-                    "success" => false,
-                    "message" => "vendor_id and name are required"
-                ]);
+                echo json_encode(["success" => false, "message" => "vendor_id and name are required"]);
                 exit;
             }
 
@@ -93,93 +88,53 @@ try {
             $description = $data['description'] ?? null;
             $is_featured = $data['isFeatured'] ?? false;
 
-            // ===== IMAGE HANDLING =====
+            // ===== IMAGE HANDLING (DB ONLY) =====
             $imageUrl = null;
             $imageData = null;
 
             if (!empty($data['imageData'])) {
                 $imageData = base64_decode($data['imageData']);
                 if ($imageData === false) {
-                    echo json_encode([
-                        "success" => false,
-                        "message" => "Failed to decode image data"
-                    ]);
+                    echo json_encode(["success" => false, "message" => "Invalid image data"]);
                     exit;
                 }
-
-                // Generate unique filename
-                $fileName = 'product_' . uniqid() . '.jpg';
-                $uploadDir = __DIR__ . '/../uploads/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
-                }
-
-                // Save file to uploads/
-                file_put_contents($uploadDir . $fileName, $imageData);
-
-                $imageUrl = $fileName; // Store only filename
+                $imageUrl = 'product_' . uniqid() . '.jpg';
             }
 
             // ===== CHECK MAX PRODUCTS =====
-            $checkQuery = "SELECT COUNT(*) as product_count FROM vendor_products WHERE vendor_id = :vendor_id";
-            $checkStmt = $db->prepare($checkQuery);
+            $checkStmt = $db->prepare("SELECT COUNT(*) FROM vendor_products WHERE vendor_id = :vendor_id");
             $checkStmt->bindParam(':vendor_id', $vendor_id);
             $checkStmt->execute();
-            $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($result['product_count'] >= 10) {
-                echo json_encode([
-                    "success" => false,
-                    "message" => "You can only add up to 10 products."
-                ]);
+            if ($checkStmt->fetchColumn() >= 10) {
+                echo json_encode(["success" => false, "message" => "Limit is 10 products"]);
                 exit;
             }
 
             // ===== INSERT PRODUCT =====
-            $query = "INSERT INTO vendor_products 
+            $query = "
+                INSERT INTO vendor_products
                 (vendor_id, name, description, image_url, image_data, is_featured, created_at)
-            VALUES 
-                (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
-            RETURNING id, vendor_id, name, description, image_url, is_featured, created_at";
+                VALUES (:vendor_id, :name, :description, :image_url, :image_data, :is_featured, NOW())
+                RETURNING id, vendor_id, name, description, image_url, is_featured, created_at
+            ";
 
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
             $stmt->bindParam(':name', $name);
             $stmt->bindParam(':description', $description);
             $stmt->bindParam(':image_url', $imageUrl);
-            $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);  // <-- store bytea
+            $stmt->bindParam(':image_data', $imageData, PDO::PARAM_LOB);
             $stmt->bindParam(':is_featured', $is_featured, PDO::PARAM_BOOL);
 
-
-            try {
-                if ($stmt->execute()) {
-                    $newProduct = $stmt->fetch(PDO::FETCH_ASSOC);
-                    echo json_encode([
-                        "success" => true,
-                        "message" => "Product created successfully",
-                        "product" => $newProduct
-                    ]);
-                } else {
-                    $errorInfo = $stmt->errorInfo();
-                    echo json_encode([
-                        "success" => false,
-                        "message" => "Failed to create product: {$errorInfo[2]}"
-                    ]);
-                }
-            } catch (Exception $e) {
-                echo json_encode([
-                    "success" => false,
-                    "message" => "Exception: " . $e->getMessage()
-                ]);
-            }
+            $stmt->execute();
+            echo json_encode(["success" => true, "product" => $stmt->fetch(PDO::FETCH_ASSOC)]);
             break;
-
 
         // ===================== PUT =====================
         case 'PUT':
             $data = json_decode(file_get_contents("php://input"), true);
             if (!isset($data['id'])) {
-                echo json_encode(["success" => false, "message" => "Product ID is required"]);
+                echo json_encode(["success" => false, "message" => "Product ID required"]);
                 exit;
             }
 
@@ -189,44 +144,32 @@ try {
                 WHERE id = :id
             ";
             $stmt = $db->prepare($query);
-            $stmt->bindParam(':id', $data['id']);
-            $stmt->bindParam(':name', $data['name']);
-            $stmt->bindParam(':description', $data['description']);
-            $stmt->bindParam(':image_url', $data['image_url']);
-            $stmt->bindParam(':is_featured', $data['is_featured'], PDO::PARAM_BOOL);
+            $stmt->execute([
+                ':id' => $data['id'],
+                ':name' => $data['name'],
+                ':description' => $data['description'],
+                ':image_url' => $data['image_url'],
+                ':is_featured' => $data['is_featured']
+            ]);
 
-            if ($stmt->execute()) {
-                echo json_encode(["success" => true, "message" => "Product updated successfully"]);
-            } else {
-                $errorInfo = $stmt->errorInfo();
-                echo json_encode(["success" => false, "message" => "Failed to update product: {$errorInfo[2]}"]);
-            }
+            echo json_encode(["success" => true, "message" => "Product updated"]);
             break;
 
         // ===================== DELETE =====================
         case 'DELETE':
             $data = json_decode(file_get_contents("php://input"), true);
             if (!isset($data['id'])) {
-                echo json_encode(["success" => false, "message" => "Product ID is required"]);
+                echo json_encode(["success" => false, "message" => "Product ID required"]);
                 exit;
             }
-
             $stmt = $db->prepare("DELETE FROM vendor_products WHERE id = :id");
-            $stmt->bindParam(':id', $data['id']);
-
-            if ($stmt->execute()) {
-                echo json_encode(["success" => true, "message" => "Product deleted successfully"]);
-            } else {
-                $errorInfo = $stmt->errorInfo();
-                echo json_encode(["success" => false, "message" => "Failed to delete product: {$errorInfo[2]}"]);
-            }
+            $stmt->execute([':id' => $data['id']]);
+            echo json_encode(["success" => true, "message" => "Product deleted"]);
             break;
 
-        // ===================== DEFAULT =====================
         default:
-            echo json_encode(["success" => false, "message" => "Method not allowed"]);
-            break;
+            echo json_encode(["success" => false, "message" => "Invalid method"]);
     }
 } catch (Exception $e) {
-    echo json_encode(["success" => false, "message" => "Exception: " . $e->getMessage()]);
+    echo json_encode(["success" => false, "message" => $e->getMessage()]);
 }
