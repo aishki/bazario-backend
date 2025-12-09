@@ -46,7 +46,8 @@ try {
             $vendorId = $data['vendor_id'];
             $eventId = $data['event_id'];
             $reminderDatetime = $data['reminder_datetime'];
-            $reminderType = $data['reminder_type'];
+            $reminderType = isset($data['reminder_type']) ? $data['reminder_type'] : 'custom';
+
 
             $query = "INSERT INTO vendor_event_reminders 
                      (vendor_id, event_id, reminder_type, reminder_datetime) 
