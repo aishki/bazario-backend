@@ -45,6 +45,7 @@ switch ($method) {
                          p.name,
                          p.price,
                          p.image_url,
+                         ENCODE(p.image_data, 'base64') AS imageData,
                          v.business_name
                        FROM cart_items ci
                        JOIN products p ON ci.product_id = p.id
