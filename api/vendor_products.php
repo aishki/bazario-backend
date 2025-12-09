@@ -56,6 +56,7 @@ try {
                     vp.name,
                     vp.description,
                     vp.image_url,
+                    vp.image_data, -- Include image_data in response
                     vp.is_featured,
                     vp.created_at,
                     p.price,
@@ -71,7 +72,15 @@ try {
             $stmt = $db->prepare($query);
             $stmt->bindParam(':vendor_id', $vendor_id);
             $stmt->execute();
-            echo json_encode(["success" => true, "products" => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($products as &$product) {
+                if (!empty($product['image_data'])) {
+                    $product['image_data'] = base64_encode($product['image_data']);
+                }
+            }
+
+            echo json_encode(["success" => true, "products" => $products]);
             break;
 
         // ===================== POST =====================
@@ -88,14 +97,12 @@ try {
             $description = $data['description'] ?? null;
             $is_featured = $data['isFeatured'] ?? false;
 
-            // ===== IMAGE HANDLING (DB ONLY) =====
+            // ===== IMAGE HANDLING (BYTES ONLY) =====
             $imageUrl = null;
             $imageData = null;
 
             if (!empty($data['imageData'])) {
                 $base64String = $data['imageData'];
-
-                // The Dart side sends raw base64, so decode it directly
                 $imageData = base64_decode($base64String, true);
 
                 if ($imageData === false) {
@@ -103,9 +110,8 @@ try {
                     exit;
                 }
 
-                // Generate unique filename - store in URL for reference
                 $fileName = 'product_' . uniqid() . '.jpg';
-                $imageUrl = "https://bazario-backend-aszl.onrender.com/api/get_product_image.php?product_id=";
+                $imageUrl = $fileName;
             }
 
             // ===== CHECK MAX PRODUCTS =====
@@ -143,12 +149,8 @@ try {
             $stmt->execute();
             $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($product && $imageUrl) {
-                $product['image_url'] = $imageUrl . $product['id'];
-                $updateStmt = $db->prepare("UPDATE vendor_products SET image_url = :image_url WHERE id = :id");
-                $updateStmt->bindParam(':image_url', $product['image_url']);
-                $updateStmt->bindParam(':id', $product['id']);
-                $updateStmt->execute();
+            if ($product && !empty($product['image_data'])) {
+                $product['image_data'] = base64_encode($product['image_data']);
             }
 
             echo json_encode(["success" => true, "product" => $product]);
