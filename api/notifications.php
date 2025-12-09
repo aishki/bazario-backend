@@ -57,6 +57,31 @@ switch ($method) {
         echo json_encode(["success" => true, "message" => "Notification marked as read"]);
         break;
 
+    // POST - Create notification
+    case 'POST':
+        $data = json_decode(file_get_contents("php://input"));
+        if (!isset($data->user_id) || !isset($data->message)) {
+            echo json_encode(["success" => false, "message" => "user_id and message required"]);
+            exit;
+        }
+
+        $user_id = $data->user_id;
+        $message = $data->message;
+        $type = $data->type ?? 'general';
+        $order_id = $data->order_id ?? null;
+
+        $query = "INSERT INTO notifications (user_id, message, type, order_id, read, created_at)
+                  VALUES (:uid, :msg, :type, :oid, false, CURRENT_TIMESTAMP)";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':uid', $user_id);
+        $stmt->bindParam(':msg', $message);
+        $stmt->bindParam(':type', $type);
+        $stmt->bindParam(':oid', $order_id);
+        $stmt->execute();
+
+        echo json_encode(["success" => true, "message" => "Notification created"]);
+        break;
+
     default:
         echo json_encode(["success" => false, "message" => "Method not allowed"]);
         break;
