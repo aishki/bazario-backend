@@ -56,7 +56,7 @@ try {
                     vp.name,
                     vp.description,
                     vp.image_url,
-                    vp.image_data, -- Include image_data in response
+                    vp.image_data,
                     vp.is_featured,
                     vp.created_at,
                     p.price,
@@ -76,7 +76,12 @@ try {
 
             foreach ($products as &$product) {
                 if (!empty($product['image_data'])) {
-                    $product['image_data'] = base64_encode($product['image_data']);
+                    // BYTEA from PostgreSQL needs stream_get_contents if it's a resource
+                    $imageData = $product['image_data'];
+                    if (is_resource($imageData)) {
+                        $imageData = stream_get_contents($imageData);
+                    }
+                    $product['image_data'] = base64_encode($imageData);
                 }
             }
 
@@ -150,7 +155,11 @@ try {
             $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($product && !empty($product['image_data'])) {
-                $product['image_data'] = base64_encode($product['image_data']);
+                $imageData = $product['image_data'];
+                if (is_resource($imageData)) {
+                    $imageData = stream_get_contents($imageData);
+                }
+                $product['image_data'] = base64_encode($imageData);
             }
 
             echo json_encode(["success" => true, "product" => $product]);
