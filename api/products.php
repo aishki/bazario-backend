@@ -45,6 +45,17 @@ try {
 
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    foreach ($products as &$product) {
+        if (!empty($product['image_data'])) {
+            // Convert resource/stream to binary string
+            if (is_resource($product['image_data'])) {
+                $product['image_data'] = base64_encode(stream_get_contents($product['image_data']));
+            } else {
+                $product['image_data'] = base64_encode($product['image_data']);
+            }
+        }
+    }
+
     echo json_encode([
         "success" => true,
         "products" => $products
